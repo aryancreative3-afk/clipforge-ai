@@ -31,11 +31,12 @@ const thumbnailTemplates = [
 ]
 
 const agentSuggestions = [
-  'Make my hook more dramatic',
-  'Suggest a better title',
-  'Change style to Cinematic',
-  'Make it shorter — under 45 seconds',
-  'Add more emotion to the CTA',
+  '🎬 Make hook more dramatic',
+  '💡 Suggest better title',
+  '📊 Score my viral potential',
+  '✂️ Make it under 45 seconds',
+  '🔥 Rewrite in Cinematic style',
+  '📣 Stronger CTA please',
 ]
 
 const recentShorts = [
@@ -131,24 +132,48 @@ export default function Dashboard() {
     setIsGenerating(false)
   }
 
-  async function handleAgentSend(msg?: string) {
-    const text = msg || agentInput
-    if (!text.trim()) return
-    setAgentMessages(prev => [...prev, { role: 'user', text }])
-    setAgentInput('')
-    setAgentTyping(true)
-    await new Promise(r => setTimeout(r, 1500))
-    const responses: Record<string, string> = {
-      'Make my hook more dramatic': '🎬 Here\'s a more dramatic hook:\n\n"In 1972, an astronaut whispered something into his mic that NASA immediately classified. 50 years later — we finally know what he saw."\n\nWant me to update your script with this?',
-      'Suggest a better title': '💡 Here are 3 viral title options:\n\n1. "The Moon Secret NASA Doesn\'t Want You to Know"\n2. "Why Astronauts Were Ordered Never to Return"\n3. "The Last Moon Mission — What Really Happened"\n\nWhich one do you prefer?',
-      'Change style to Cinematic': '🎬 Switching to Cinematic style! Your script will now have:\n- Dramatic pauses\n- Atmospheric storytelling\n- Suspenseful pacing\n\nRegenerate to apply the new style!',
-      'Make it shorter — under 45 seconds': '✂️ I\'ve trimmed your script to under 45 seconds by:\n- Cutting the middle exposition\n- Making the hook punchier\n- Tightening the CTA\n\nThe new runtime is approximately 42 seconds.',
-      'Add more emotion to the CTA': '❤️ Here\'s an emotional CTA:\n\n"If this changed how you see the world — share it with someone who needs to know the truth. Follow for more hidden stories. 🌙"\n\nMuch more powerful, right?',
+async function handleAgentSend(msg?: string) {
+  const text = msg || agentInput
+  if (!text.trim()) return
+
+  const newUserMsg = { role: 'user', text }
+  const updatedMessages = [...agentMessages, newUserMsg]
+  
+  setAgentMessages(updatedMessages)
+  setAgentInput('')
+  setAgentTyping(true)
+
+  try {
+    const res = await fetch('/api/agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: updatedMessages,
+        script,
+        idea,
+        style
+      })
+    })
+
+    const data = await res.json()
+
+    if (data.reply) {
+      setAgentMessages(prev => [...prev, { role: 'agent', text: data.reply }])
+    } else {
+      setAgentMessages(prev => [...prev, { 
+        role: 'agent', 
+        text: '⚠️ Agent unavailable right now. Please add Anthropic API credits to activate.' 
+      }])
     }
-    const reply = responses[text] || `Great question! For "${text}" — I'd recommend focusing on your hook first since that's what determines if viewers watch past 3 seconds. Want me to suggest some improvements?`
-    setAgentMessages(prev => [...prev, { role: 'agent', text: reply }])
-    setAgentTyping(false)
+  } catch {
+    setAgentMessages(prev => [...prev, { 
+      role: 'agent', 
+      text: '⚠️ Connection error. Please try again.' 
+    }])
   }
+
+  setAgentTyping(false)
+}
 
   return (
     <div className="min-h-screen bg-[#050d1a] text-white flex flex-col">
@@ -187,7 +212,7 @@ export default function Dashboard() {
       <div className="flex flex-1 relative">
 
         {/* MAIN CONTENT */}
-        <div className={`flex-1 px-6 py-10 transition-all ${agentOpen && done ? 'mr-80' : ''}`}>
+        <div className="flex-1 px-4 sm:px-6 py-6 sm:py-10 overflow-x-hidden">
 
           {activeTab === 'create' && (
             <>
@@ -257,7 +282,7 @@ export default function Dashboard() {
 
               {/* EDITOR */}
               {done && (
-                <div className="max-w-6xl mx-auto">
+                <div className="max-w-6xl mx-auto w-full">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h2 className="text-2xl font-black">Video Editor</h2>
@@ -268,13 +293,13 @@ export default function Dashboard() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
                     {/* VIDEO PREVIEW */}
                     <div className="col-span-1 lg:col-span-1">
                       <div className="sticky top-24">
                         {/* Phone frame */}
-                        <div className="relative mx-auto" style={{ width: '200px' }}>
+                        <div className="relative mx-auto" style={{ width: '180px' }}>
                           <div className="bg-gray-900 rounded-[2rem] border-4 border-gray-700 overflow-hidden shadow-2xl" style={{ aspectRatio: aspectRatio === '9:16' ? '9/16' : aspectRatio === '1:1' ? '1/1' : '16/9' }}>
                             <div className="w-full h-full bg-gradient-to-b from-[#0a1628] to-[#050d1a] flex flex-col items-center justify-center relative">
                               {/* Fake video content */}
@@ -357,7 +382,7 @@ export default function Dashboard() {
                     {/* EDITOR PANELS */}
                     <div className="col-span-1 lg:col-span-2">
                       {/* Editor tabs */}
-                      <div className="flex gap-2 mb-6 flex-wrap">
+                      <div className="grid grid-cols-3 gap-4 mb-6">
                         {[
                           { id: 'video', label: '🎬 Video' },
                           { id: 'captions', label: '💬 Captions' },

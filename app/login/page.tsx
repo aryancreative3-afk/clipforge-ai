@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -16,15 +17,26 @@ export default function Login() {
     }
     setLoading(true)
     setError('')
-    await new Promise(r => setTimeout(r, 1500))
-    setLoading(false)
-    window.location.href = '/dashboard'
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    } else {
+      window.location.href = '/dashboard'
+    }
+  }
+
+  async function handleGoogleLogin() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`
+      }
+    })
   }
 
   return (
     <div className="min-h-screen bg-[#050d1a] text-white flex flex-col">
-
-      {/* Top nav */}
       <nav className="px-6 h-16 flex items-center justify-between border-b border-white/10">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00c8ff] to-[#7b2fff] flex items-center justify-center text-sm font-black">C</div>
@@ -35,21 +47,16 @@ export default function Login() {
         </Link>
       </nav>
 
-      {/* Main */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
-
-          {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00c8ff]/20 to-[#7b2fff]/20 border border-white/10 flex items-center justify-center text-3xl mx-auto mb-4">
-              👋
-            </div>
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00c8ff]/20 to-[#7b2fff]/20 border border-white/10 flex items-center justify-center text-3xl mx-auto mb-4">👋</div>
             <h1 className="text-3xl font-black mb-2">Welcome back</h1>
             <p className="text-gray-400">Log in to continue creating Shorts</p>
           </div>
 
-          {/* Google button */}
-          <button className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 rounded-xl mb-6 hover:bg-gray-100 transition-all">
+          <button onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 rounded-xl mb-6 hover:bg-gray-100 transition-all">
             <svg width="20" height="20" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -59,51 +66,33 @@ export default function Login() {
             Continue with Google
           </button>
 
-          {/* Divider */}
           <div className="flex items-center gap-4 mb-6">
             <div className="flex-1 h-px bg-white/10" />
             <span className="text-gray-500 text-sm">or continue with email</span>
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          {/* Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
-                {error}
-              </div>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">{error}</div>
             )}
-
             <div>
               <label className="text-sm text-gray-400 font-medium block mb-2">Email address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
-              />
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#00c8ff]/50 transition-colors" />
             </div>
-
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm text-gray-400 font-medium">Password</label>
                 <a href="#" className="text-xs text-[#00c8ff] hover:underline">Forgot password?</a>
               </div>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
-              />
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#00c8ff]/50 transition-colors" />
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] text-black font-black text-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
+            <button type="submit" disabled={loading}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] text-black font-black text-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2">
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
@@ -115,11 +104,8 @@ export default function Login() {
               ) : 'Log In →'}
             </button>
           </form>
-
           <p className="text-center text-gray-600 text-xs mt-6">
-            By continuing you agree to our{' '}
-            <a href="#" className="text-gray-400 hover:text-white">Terms</a> and{' '}
-            <a href="#" className="text-gray-400 hover:text-white">Privacy Policy</a>
+            By continuing you agree to our <a href="#" className="text-gray-400 hover:text-white">Terms</a> and <a href="#" className="text-gray-400 hover:text-white">Privacy Policy</a>
           </p>
         </div>
       </div>
