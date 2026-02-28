@@ -1,64 +1,49 @@
-const plans = [
-  {
-    name: "Spark",
-    price: "Free",
-    desc: "Try it out",
-    features: ["3 Shorts per month", "Watermarked", "Standard voices", "720p export"],
-    cta: "Start Free",
-    highlight: false,
-  },
-  {
-    name: "Starter",
-    price: "$19",
-    desc: "per month",
-    features: ["20 Shorts per month", "No watermark", "5 voice options", "1080p export", "YouTube auto-upload", "Caption styles"],
-    cta: "Get Started",
-    highlight: true,
-  },
-  {
-    name: "Pro",
-    price: "$49",
-    desc: "per month",
-    features: ["Unlimited Shorts", "All voices + voice cloning", "Cinematic video styles", "Priority rendering", "Analytics dashboard", "Thumbnail generation"],
-    cta: "Go Pro",
-    highlight: false,
-  },
-]
+import Link from 'next/link'
 
 export default function Pricing() {
+  const plans = [
+    { name: 'Spark', price: 'Free', color: '#ffffff', features: ['3 Shorts/month', 'Watermarked', '720p quality', 'Basic voices'], cta: 'Get Started', highlight: false },
+    { name: 'Starter', price: '$19/mo', color: '#00c8ff', features: ['20 Shorts/month', 'No watermark', '1080p quality', 'YouTube upload'], cta: 'Start Free Trial', highlight: true },
+    { name: 'Pro', price: '$49/mo', color: '#7b2fff', features: ['Unlimited Shorts', 'Voice cloning', 'Priority rendering', 'Analytics'], cta: 'Go Pro', highlight: false },
+  ]
+
   return (
-    <section id="pricing" className="py-32 px-6">
+    <section id="pricing" className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-20">
+        <div className="text-center mb-16">
           <p className="text-[#00c8ff] text-sm font-semibold tracking-[4px] uppercase mb-4">Pricing</p>
-          <h2 className="text-5xl font-black mb-6">Simple, honest pricing</h2>
-          <p className="text-gray-400 text-xl">Start free. Scale when you're ready.</p>
+          <h2 className="text-4xl sm:text-5xl font-black mb-4">Simple, honest pricing</h2>
+          <p className="text-gray-400 text-xl">Start free. Scale when ready.</p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8 items-center">
-          {plans.map((plan) => (
-            <div key={plan.name} className={`p-8 rounded-2xl border transition-all ${plan.highlight ? 'border-[#00c8ff] bg-gradient-to-b from-[#00c8ff]/10 to-transparent scale-105' : 'border-white/10 bg-white/5 hover:border-white/20'}`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plans.map(plan => (
+            <div key={plan.name}
+              className={`relative rounded-2xl border p-8 flex flex-col transition-all hover:-translate-y-1 ${plan.highlight ? 'border-[#00c8ff] bg-gradient-to-b from-[#00c8ff]/10 to-transparent' : 'border-white/10 bg-white/5'}`}>
               {plan.highlight && (
-                <div className="text-xs font-bold text-black bg-[#00c8ff] rounded-full px-3 py-1 inline-block mb-4">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#00c8ff] text-black text-xs font-black px-4 py-1 rounded-full">
                   MOST POPULAR
                 </div>
               )}
-              <h3 className="text-2xl font-black mb-1">{plan.name}</h3>
-              <div className="flex items-end gap-1 mb-6">
-                <span className="text-5xl font-black">{plan.price}</span>
-                <span className="text-gray-400 mb-2">{plan.desc}</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((f) => (
+              <h3 className="text-xl font-black mb-2" style={{ color: plan.color }}>{plan.name}</h3>
+              <div className="text-4xl font-black mb-6">{plan.price}</div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {plan.features.map(f => (
                   <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
-                    <span className="text-[#00c8ff]">✓</span> {f}
+                    <span style={{ color: plan.color }}>✓</span> {f}
                   </li>
                 ))}
               </ul>
-              <button className={`w-full py-3 rounded-full font-bold transition-all ${plan.highlight ? 'bg-[#00c8ff] text-black hover:bg-[#00a8dd]' : 'border border-white/20 hover:border-white/40'}`}>
+              <Link href="/signup"
+                className={`w-full py-3 rounded-xl font-bold text-center text-sm transition-all block ${plan.highlight ? 'bg-[#00c8ff] text-black hover:bg-[#00a8dd]' : 'border border-white/20 hover:border-white/40 text-white'}`}>
                 {plan.cta}
-              </button>
+              </Link>
             </div>
           ))}
+        </div>
+        <div className="text-center mt-8">
+          <Link href="/pricing" className="text-[#00c8ff] hover:underline text-sm font-semibold">
+            See full pricing comparison →
+          </Link>
         </div>
       </div>
     </section>
