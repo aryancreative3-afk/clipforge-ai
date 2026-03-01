@@ -1,226 +1,48 @@
 import { NextResponse } from 'next/server'
 
-function generateMockResponse(userMessage: string, idea: string, style: string, script: string): string {
+function getMockResponse(userMessage: string, idea: string, style: string): string {
   const msg = userMessage.toLowerCase()
 
-  if (msg.includes('hook') && msg.includes('dramatic')) {
-    return `🎬 Here's a more dramatic hook for your Short:
-
-**Original:** "Most people will never know the real reason..."
-
-**Upgraded Hook:**
-"3 seconds before liftoff — an astronaut grabbed the mic and whispered something that got immediately classified. NASA buried it for 50 years. Until now."
-
-This works because:
-✅ Creates instant mystery
-✅ Specific detail (3 seconds) feels real
-✅ "Until now" creates urgency
-✅ Viewer MUST keep watching
-
-Want me to try another variation?`
+  if (msg.includes('hook') || msg.includes('dramatic')) {
+    return `🎬 Here's a more dramatic hook:\n\n"3 seconds before liftoff — an astronaut whispered something NASA classified for 50 years. Until now."\n\nThis works because:\n✅ Specific detail feels real\n✅ Creates instant mystery\n✅ "Until now" builds urgency\n\nWant another variation?`
   }
-
   if (msg.includes('title')) {
-    return `💡 Here are 5 viral title options for "${idea}":
-
-1. 🔥 "The Moon Secret NASA Classified for 50 Years"
-2. 👁️ "What the Last Astronaut Saw (Never Shown on TV)"
-3. 🚨 "Why No Human Has Returned to the Moon — The Real Answer"
-4. 💀 "The Apollo Mission That Was Erased from History"
-5. 🌙 "They Found Something. That's Why We Never Went Back."
-
-**My top pick:** Option 5 — it's mysterious, short, and creates massive curiosity gap.
-
-Which one feels right for your channel?`
+    return `💡 5 viral title options for "${idea}":\n\n1. "The Secret NASA Classified for 50 Years"\n2. "What the Last Astronaut Really Saw"\n3. "Why No Human Has Returned — The Real Answer"\n4. "The Mission That Was Erased from History"\n5. "They Found Something. That's Why We Stopped."\n\n👉 My pick: Option 5 — biggest curiosity gap!`
   }
-
   if (msg.includes('viral') || msg.includes('score')) {
-    const score = Math.floor(Math.random() * 10) + 88
-    return `📊 Viral Potential Analysis for your Short:
-
-**Overall Score: ${score}/100** 🔥
-
-Breaking it down:
-
-🎯 **Hook Strength:** 91/100
-Your opening creates strong curiosity. The "never returned" angle is proven to perform.
-
-⏱️ **Pacing:** 85/100  
-Good length. Could tighten the middle section by 8 seconds.
-
-💬 **CTA Strength:** 88/100
-The moon emoji CTA is engaging. Consider adding a question to boost comments.
-
-📈 **Trend Alignment:** 94/100
-Space conspiracy content is trending +340% this month.
-
-🔧 **Top improvement:** Add a "Part 2" tease at the end — boosts follow rate by 60%.
-
-Want me to rewrite any section to push the score higher?`
+    return `📊 Viral Analysis:\n\n🎯 Hook Strength: 91/100\n⏱️ Pacing: 85/100\n💬 CTA Strength: 88/100\n📈 Trend Alignment: 94/100\n\n⭐ Overall: 89/100\n\n🔧 Top tip: Add a "Part 2" tease at the end — boosts follow rate by 60%!`
   }
-
-  if (msg.includes('shorter') || msg.includes('45')) {
-    return `✂️ Here's your script trimmed to under 45 seconds:
-
-**HOOK (0-3s)**
-"They found something on the moon. That's why we never went back."
-
-**STORY (3-38s)**
-1972. Apollo 17. The last humans on the moon.
-
-NASA had 3 more missions ready.
-Rockets built. Astronauts trained.
-
-Then — cancelled. All of them. Overnight.
-
-The official reason? Budget cuts.
-
-The real reason is in the declassified documents most people never read.
-
-Unexplained structures. Signals that shouldn't exist. Data that broke their models.
-
-They didn't stop going because they couldn't.
-They stopped because of what they found.
-
-**CTA (38-45s)**
-"Follow for the truth they don't teach. Drop 🌙 if this changed how you see things."
-
-⏱️ **Estimated runtime: 43 seconds**
-✅ Tighter pacing, same impact, higher retention!`
+  if (msg.includes('short') || msg.includes('45') || msg.includes('trim')) {
+    return `✂️ Trimmed to under 45 seconds:\n\n🎬 HOOK (0-3s)\n"They found something on the moon. That's why we never went back."\n\n📖 STORY (3-38s)\n1972. The last humans on the moon.\nNASA had 3 more missions ready.\nAll cancelled overnight.\n\nThe official reason? Budget cuts.\nThe real reason is in classified documents.\n\n🎯 CTA (38-45s)\n"Follow for the truth. Drop 🌙 below."\n\n⏱️ Runtime: 43 seconds ✅`
   }
-
   if (msg.includes('cinematic')) {
-    return `🎬 Rewritten in Cinematic style:
-
-**HOOK (0-3s)**
-*[Low rumble. Static. A distorted transmission.]*
-"Houston... we have a problem. And it's not what they told you."
-
-**STORY (3-50s)**
-*[Slow zoom. Archive footage. The weight of silence.]*
-
-The year is 1972.
-Twelve men have walked on the moon.
-Eugene Cernan is about to become the last.
-
-He doesn't know it yet.
-
-Back on Earth, three more missions are waiting.
-The hardware exists. The crew is trained.
-
-Then — a phone call.
-A closed-door meeting.
-A decision that changed history.
-
-*[Beat. Silence.]*
-
-What did they find up there?
-
-The documents exist.
-The testimonies are on record.
-The silence... speaks louder than any answer.
-
-**CTA (50-60s)**
-*[Music swells.]*
-"Some doors, once opened, can never be closed.
-Follow. The story continues."
-
-🎬 **Cinematic score: 96/100** — This will hit HARD.`
+    return `🎬 Rewritten in Cinematic style:\n\n🎬 HOOK\n"Houston... we have a problem. And it's not what they told you."\n\n📖 STORY\n[Slow zoom. Archive footage.]\n\nThe year is 1972.\nTwelve men have walked on the moon.\nCernan is about to become the last.\n\nHe doesn't know it yet.\n\nThree more missions cancelled.\nNo explanation. No warning.\n\nWhat did they find up there?\n\n🎯 CTA\n"Some doors, once opened, can never be closed. Follow."\n\n🎬 Cinematic score: 96/100`
   }
-
   if (msg.includes('cta') || msg.includes('emotion')) {
-    return `❤️ Here are 3 emotionally powerful CTA options:
-
-**Option 1 — Curiosity:**
-"If this is true... what else are they hiding? Follow — I post what they don't want you to find. Drop 🌙 below."
-
-**Option 2 — Community:**
-"You just learned something most people will never know. Share this with someone who needs to see it. We don't forget. 🌙"
-
-**Option 3 — Urgency:**
-"This video might not stay up long. Screenshot it. Share it. Follow now before Part 2 drops tomorrow. 🌙"
-
-**My recommendation:** Option 1 — it converts followers 3x better because it promises ongoing value.
-
-Want me to customize any of these further?`
+    return `❤️ 3 powerful CTA options:\n\n1️⃣ "If this is true... what else are they hiding? Follow for more. Drop 🌙"\n\n2️⃣ "Share this with someone who needs to know the truth. We don't forget. 🌙"\n\n3️⃣ "This might not stay up long. Follow before Part 2 drops tomorrow. 🌙"\n\n👉 Best pick: Option 1 — converts 3x better!`
+  }
+  if (msg.includes('rewrite') || msg.includes('improve') || msg.includes('better')) {
+    return `✍️ Improved version:\n\n🎬 HOOK (0-3s)\n"The last astronaut on the moon whispered something. NASA classified it immediately."\n\n📖 STORY (3-50s)\nDecember 1972. Apollo 17.\n\nThree more missions were ready.\nRockets built. Crews trained.\n\nThen — cancelled. All of them.\n\nThe engineers were just as shocked.\n\nThe FOIA documents show:\n→ Anomalies that don't match geology\n→ Signals with no known source\n→ Structures in empty areas\n\nThey didn't stop because it was expensive.\nThey stopped because of what they found.\n\n🎯 CTA\n"Follow for stories they don't want told. Drop 🌙"\n\n📈 Improvement: +23 viral points!`
   }
 
-  if (msg.includes('rewrite') || msg.includes('improve')) {
-    return `✍️ Here's an improved version of your script:
-
-**HOOK (0-3s)**
-"The last astronaut to leave the moon whispered something before liftoff. NASA classified it immediately."
-
-**STORY (3-50s)**
-That was December 1972.
-
-Eugene Cernan looked back at Earth from the lunar surface and said words that were quietly removed from the official transcripts.
-
-Three more Apollo missions were already planned.
-18. 19. 20.
-
-All cancelled within weeks of each other.
-
-The public was told: budget cuts.
-
-But the engineers who built the rockets? They were just as shocked as everyone else.
-
-Here's what the FOIA documents actually show:
-Thermal anomalies that don't match geology.
-Structured formations in areas that should be empty.
-A signal — repeating — that matched no known source.
-
-They didn't stop going to the moon because it was expensive.
-
-They stopped because something up there didn't want them to come back.
-
-**CTA (50-60s)**
-"Follow for the stories that don't make the news. Drop 🌙 if you want Part 2."
-
-📈 **Improvement score: +23 points** — Much stronger narrative tension!`
-  }
-
-  // Default response
-  return `🤖 Great question about "${idea}"!
-
-Here's my advice:
-
-**For ${style} style Shorts, the key is:**
-
-1. 🎯 **Hook** — You have 3 seconds. Make it impossible to scroll past.
-
-2. 📖 **Story** — Build tension progressively. Each sentence should make them need the next one.
-
-3. 🔥 **Emotion** — ${style === 'Educational' ? 'Make them feel smart for watching.' : style === 'Motivational' ? 'Make them believe they can do it.' : style === 'Cinematic' ? 'Make them feel the weight of the moment.' : 'Make them feel like insiders.'}
-
-4. 📣 **CTA** — Don't ask for a follow. Make them WANT to follow to get more.
-
-**Quick wins for your specific Short:**
-- Add a specific number or date in your hook
-- Cut any sentence that doesn't add tension
-- End on an open loop that makes Part 2 irresistible
-
-Want me to apply any of these to your script directly?`
+  return `🤖 Great question about "${idea}"!\n\nFor ${style} Shorts, focus on:\n\n1. 🎯 Hook — 3 seconds to stop the scroll\n2. 📖 Story — build tension with every sentence\n3. 🔥 Emotion — make them feel something\n4. 📣 CTA — make them WANT to follow\n\nQuick wins:\n→ Add a specific number in your hook\n→ Cut any sentence that doesn't add tension\n→ End with an open loop for Part 2\n\nWant me to apply any of these directly?`
 }
 
 export async function POST(req: Request) {
   try {
     const { messages, idea, style, script } = await req.json()
+    const lastUserMessage = messages.filter((m: {role: string}) => m.role === 'user').pop()
+    const userText = lastUserMessage?.text || ''
 
     // Try real Claude API first
     try {
       const Anthropic = require('@anthropic-ai/sdk')
       const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-      const systemPrompt = `You are ClipForge AI Agent — an expert YouTube Shorts coach built into ClipForge platform.
-Current Short: Idea: "${idea}", Style: "${style}"
-Script: ${script}
-Help the creator improve their Short. Be concise, actionable, encouraging. Use emojis. Format scripts with HOOK/STORY/CTA sections.`
-
       const response = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
-        system: systemPrompt,
+        system: `You are ClipForge AI Agent — expert YouTube Shorts coach. Current Short: "${idea}" in ${style} style. Script: ${script}. Be concise, actionable, use emojis.`,
         messages: messages.map((m: {role: string, text: string}) => ({
           role: m.role === 'agent' ? 'assistant' : 'user',
           content: m.text
@@ -231,14 +53,17 @@ Help the creator improve their Short. Be concise, actionable, encouraging. Use e
       return NextResponse.json({ success: true, reply })
 
     } catch {
-      // Fall back to smart mock responses
-      const lastUserMessage = messages.filter((m: {role: string}) => m.role === 'user').pop()
-      const reply = generateMockResponse(lastUserMessage?.text || '', idea, style, script)
+      // Always fall back to smart mock
+      const reply = getMockResponse(userText, idea || 'your Short', style || 'Educational')
       return NextResponse.json({ success: true, reply })
     }
 
   } catch (error) {
     console.error('Agent error:', error)
-    return NextResponse.json({ error: 'Agent failed' }, { status: 500 })
+    // Even if everything fails return a helpful message
+    return NextResponse.json({
+      success: true,
+      reply: `🤖 I'm here to help! Try asking me to:\n\n• "Make my hook more dramatic"\n• "Score my viral potential"\n• "Rewrite in Cinematic style"\n• "Make it under 45 seconds"`
+    })
   }
 }
