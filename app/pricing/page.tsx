@@ -451,16 +451,3 @@ export default function Pricing() {
     </div>
   )
 }
-```
-
-Save **Ctrl+S**.
-
----
-
-Now add Razorpay keys to Vercel too:
-
-**1.** Go to Vercel → your project → **Settings** → **Environment Variables**
-**2.** Add:
-```
-NEXT_PUBLIC_RAZORPAY_KEY_ID = rzp_test_xxxxxxxxxx
-RAZORPAY_KEY_SECRET = xxxxxxxxxxxxxxxxxx

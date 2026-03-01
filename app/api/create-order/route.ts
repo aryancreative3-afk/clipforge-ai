@@ -8,15 +8,11 @@ export async function POST(req: Request) {
     const keySecret = process.env.RAZORPAY_KEY_SECRET
 
     if (!keyId || !keySecret) {
-      console.error('Missing Razorpay keys')
       return NextResponse.json({ error: 'Payment not configured' }, { status: 500 })
     }
 
     const Razorpay = require('razorpay')
-    const razorpay = new Razorpay({
-      key_id: keyId,
-      key_secret: keySecret,
-    })
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret })
 
     const order = await razorpay.orders.create({
       amount: amount * 100,
@@ -29,9 +25,6 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('Razorpay error:', error?.message || error)
-    return NextResponse.json({ 
-      error: 'Failed to create order',
-      details: error?.message 
-    }, { status: 500 })
+    return NextResponse.json({ error: error?.message || 'Failed' }, { status: 500 })
   }
 }
