@@ -330,7 +330,7 @@ export default function Dashboard() {
   const [currentStep, setCurrentStep] = useState(0)
   const [done, setDone] = useState(false)
   const [activeTab, setActiveTab] = useState<'create' | 'inspire' | 'history'>('create')
-  const [activeEditorTab, setActiveEditorTab] = useState<'video' | 'captions' | 'voice' | 'language' | 'media' | 'brand' | 'thumbnail' | 'export'>('video')
+  const [activeEditorTab, setActiveEditorTab] = useState<'video' | 'generate' | 'captions' | 'voice' | 'language' | 'media' | 'brand' | 'thumbnail' | 'export'>('video')
   const [script, setScript] = useState('')
   const [generatedScript, setGeneratedScript] = useState('')
   const [viralScore, setViralScore] = useState(0)
@@ -754,7 +754,7 @@ export default function Dashboard() {
   const currentAspect = aspectRatios.find(a => a.ratio === aspectRatio) || aspectRatios[0]
   const scoreColor = viralScore >= 90 ? '#00ff88' : viralScore >= 75 ? '#00c8ff' : '#ffaa00'
 
-  const editorTabs = [
+  const editorTabs: Array<{ id: 'video' | 'generate' | 'captions' | 'voice' | 'language' | 'media' | 'brand' | 'thumbnail' | 'export'; label: string }> = [
     { id: 'video', label: '🎬 Script' },
     { id: 'generate', label: '🎥 Video' },
     { id: 'captions', label: '💬 Captions' },
