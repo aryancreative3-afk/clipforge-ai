@@ -555,8 +555,7 @@ export default function Dashboard() {
     setAudioError('')
     setGeneratedAudioUrl(null)
     try {
-      const cleanText = script.replace(/[🎬📖🎯].{0,10}\(.*?\)/g, '').replace(/^\s*[
-]/gm, '').trim()
+      const cleanText = script.replace(/[^\x00-\x7F\s]/g, '').replace(/HOOK.*|STORY.*|CTA.*/g, '').replace(/\s+/g, ' ').trim()
       const dataUrl = await callGenerateVoice(cleanText, selectedElevenVoice.id, {
         stability: voiceStability,
         similarityBoost: voiceSimilarity,
