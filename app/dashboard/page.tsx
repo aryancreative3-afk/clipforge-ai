@@ -168,8 +168,9 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
     }),
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err?.error?.message || `API error ${res.status}`)
+    let errMsg = `HTTP ${res.status}`
+    try { const e = await res.json(); errMsg = e?.error?.message || errMsg } catch {}
+    throw new Error(errMsg)
   }
   const data = await res.json()
   return data.content?.[0]?.text || ''
@@ -360,7 +361,7 @@ export default function Dashboard() {
 Rules: No fluff. No intros. Start with hook immediately. Every line must earn its place.`,
         `Write a ${effectiveStyle} YouTube Short script about: ${idea}`
       )
-    } catch {
+    } catch (err: any) {
       newScript = `🎬 HOOK (0–3s)\n"${idea.slice(0, 60)} — most people have no idea."\n\n📖 STORY (3–50s)\nHere's what they don't tell you.\nThe truth has been hiding in plain sight.\nAnd once you see it, you can't unsee it.\n\nThis isn't opinion.\nThis is documented fact.\nThe evidence has existed for decades.\n\nYet nobody talks about it.\nUntil now.\n\n🎯 CTA (50–60s)\n"Follow for more stories they don't want you to know."`
     }
     setScript(newScript)
@@ -459,7 +460,7 @@ Rules: No fluff. No intros. Start with hook immediately. Every line must earn it
         `Current script:\n${script}\n\nInstruction: ${magicCommand}`
       )
       setMagicResult(result)
-    } catch { setMagicResult('⚠️ Something went wrong. Please try again.') }
+    } catch (err: any) { setMagicResult('⚠️ Error: ' + (err?.message || 'Unknown error. Check API key in Vercel → Settings → Environment Variables')) }
     setMagicLoading(false)
   }
 
@@ -1299,7 +1300,12 @@ Rules: No fluff. No intros. Start with hook immediately. Every line must earn it
                 <span className="font-black text-sm">Magic Box</span>
                 <button onClick={() => { setMagicOpen(false); setMagicResult('') }} className="ml-auto text-gray-500 hover:text-white text-xs">✕</button>
               </div>
-              <p className="text-xs text-gray-500 mb-3">Type any instruction — AI rewrites your script instantly</p>
+              <p className="text-xs text-gray-500 mb-2">Type any instruction — AI rewrites your script instantly</p>
+              {!process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY && (
+                <div className="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-[10px] text-red-400">
+                  ⚠️ API key missing! Add <strong>NEXT_PUBLIC_ANTHROPIC_API_KEY</strong> in Vercel → Settings → Environment Variables, then Redeploy.
+                </div>
+              )}
               <div className="flex gap-2 mb-3">
                 <input value={magicCommand} onChange={e => setMagicCommand(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleMagicCommand()}
