@@ -150,9 +150,16 @@ const wallVideos: Record<string, { id: number; title: string; prompt: string; sc
 
 // ── CLAUDE API ────────────────────────────────────────────────────────────────
 async function callClaude(systemPrompt: string, userMessage: string): Promise<string> {
+  const apiKey = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('Add NEXT_PUBLIC_ANTHROPIC_API_KEY to .env.local')
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
@@ -160,6 +167,10 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
       messages: [{ role: 'user', content: userMessage }],
     }),
   })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || `API error ${res.status}`)
+  }
   const data = await res.json()
   return data.content?.[0]?.text || ''
 }
@@ -317,6 +328,8 @@ export default function Dashboard() {
   const [savedShorts, setSavedShorts] = useState<SavedShort[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const trimBarRef = useRef<HTMLDivElement>(null)
+  const [dragging, setDragging] = useState<'start' | 'end' | null>(null)
 
   // ── GENERATE ────────────────────────────────────────────────────────────────
   async function handleGenerate() {
@@ -713,7 +726,7 @@ Rules: No fluff. No intros. Start with hook immediately. Every line must earn it
                     </div>
                   </div>
 
-                  {/* Trim */}
+                  {/* Trim — drag handles */}
                   <div className="border-t border-white/10 pt-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-semibold text-gray-300">✂️ Trim</span>
@@ -722,33 +735,81 @@ Rules: No fluff. No intros. Start with hook immediately. Every line must earn it
                         <span className="text-[#00c8ff] ml-2 font-semibold">({Math.round((trimEnd - trimStart) * 0.58)}s)</span>
                       </span>
                     </div>
-                    <div className="relative h-8 bg-white/5 rounded-xl overflow-hidden mb-3">
-                      <div className="absolute inset-y-0 left-0 bg-black/50 rounded-l-xl" style={{ width: `${trimStart}%` }} />
-                      <div className="absolute inset-y-0 right-0 bg-black/50 rounded-r-xl" style={{ width: `${100 - trimEnd}%` }} />
-                      <div className="absolute inset-y-0 border-x-2 border-[#00c8ff]" style={{ left: `${trimStart}%`, right: `${100 - trimEnd}%` }} />
-                      <div className="absolute inset-0 flex items-center px-2 gap-0.5 pointer-events-none">
-                        {Array.from({ length: 20 }).map((_, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center">
-                            <div className={`w-0.5 bg-white/20 ${i % 5 === 0 ? 'h-4' : 'h-2'}`} />
-                          </div>
-                        ))}
+
+                    {/* Waveform + drag zone */}
+                    <div className="relative select-none" style={{ height: '52px' }}
+                      ref={trimBarRef}
+                      onMouseMove={e => {
+                        if (!trimBarRef.current || dragging === null) return
+                        const rect = trimBarRef.current.getBoundingClientRect()
+                        const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100))
+                        if (dragging === 'start') setTrimStart(Math.min(pct, trimEnd - 5))
+                        else if (dragging === 'end') setTrimEnd(Math.max(pct, trimStart + 5))
+                      }}
+                      onMouseUp={() => setDragging(null)}
+                      onMouseLeave={() => setDragging(null)}
+                      onTouchMove={e => {
+                        if (!trimBarRef.current || dragging === null) return
+                        const rect = trimBarRef.current.getBoundingClientRect()
+                        const touch = e.touches[0]
+                        const pct = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100))
+                        if (dragging === 'start') setTrimStart(Math.min(pct, trimEnd - 5))
+                        else if (dragging === 'end') setTrimEnd(Math.max(pct, trimStart + 5))
+                      }}
+                      onTouchEnd={() => setDragging(null)}>
+
+                      {/* Track background */}
+                      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-10 bg-white/5 rounded-xl overflow-hidden">
+                        {/* Dimmed zones */}
+                        <div className="absolute inset-y-0 left-0 bg-black/60" style={{ width: `${trimStart}%` }} />
+                        <div className="absolute inset-y-0 right-0 bg-black/60" style={{ width: `${100 - trimEnd}%` }} />
+                        {/* Active zone highlight */}
+                        <div className="absolute inset-y-0 bg-[#00c8ff]/10 border-y border-[#00c8ff]/30"
+                          style={{ left: `${trimStart}%`, right: `${100 - trimEnd}%` }} />
+                        {/* Left & right border lines */}
+                        <div className="absolute inset-y-0 w-0.5 bg-[#00c8ff]" style={{ left: `${trimStart}%` }} />
+                        <div className="absolute inset-y-0 w-0.5 bg-[#7b2fff]" style={{ left: `${trimEnd}%` }} />
+                        {/* Waveform ticks */}
+                        <div className="absolute inset-0 flex items-center px-2 gap-0.5 pointer-events-none">
+                          {Array.from({ length: 30 }).map((_, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center">
+                              <div className={`w-px bg-white/20 ${i % 5 === 0 ? 'h-5' : 'h-2'}`} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* START handle */}
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-10 rounded-l-lg bg-[#00c8ff] flex items-center justify-center cursor-ew-resize z-10 shadow-lg hover:scale-110 transition-transform"
+                        style={{ left: `${trimStart}%` }}
+                        onMouseDown={e => { e.preventDefault(); setDragging('start') }}
+                        onTouchStart={e => { e.preventDefault(); setDragging('start') }}>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="w-0.5 h-3 bg-white/70 rounded" />
+                          <div className="w-0.5 h-3 bg-white/70 rounded" />
+                        </div>
+                      </div>
+
+                      {/* END handle */}
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-10 rounded-r-lg bg-[#7b2fff] flex items-center justify-center cursor-ew-resize z-10 shadow-lg hover:scale-110 transition-transform"
+                        style={{ left: `${trimEnd}%` }}
+                        onMouseDown={e => { e.preventDefault(); setDragging('end') }}
+                        onTouchStart={e => { e.preventDefault(); setDragging('end') }}>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="w-0.5 h-3 bg-white/70 rounded" />
+                          <div className="w-0.5 h-3 bg-white/70 rounded" />
+                        </div>
                       </div>
                     </div>
-                    <div className="relative h-5 mb-2">
-                      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-2 bg-white/10 rounded-full" />
-                      <div className="absolute top-1/2 -translate-y-1/2 h-2 bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] rounded-full pointer-events-none"
-                        style={{ left: `${trimStart}%`, right: `${100 - trimEnd}%` }} />
-                      <input type="range" min="0" max="100" value={trimStart}
-                        onChange={e => setTrimStart(Math.min(+e.target.value, trimEnd - 5))}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" style={{ zIndex: trimStart > 50 ? 5 : 4 }} />
-                      <input type="range" min="0" max="100" value={trimEnd}
-                        onChange={e => setTrimEnd(Math.max(+e.target.value, trimStart + 5))}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" style={{ zIndex: trimEnd < 50 ? 5 : 4 }} />
-                      <div className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[#00c8ff] border-2 border-white shadow-lg pointer-events-none"
-                        style={{ left: `calc(${trimStart}% - 10px)`, zIndex: 6 }} />
-                      <div className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[#7b2fff] border-2 border-white shadow-lg pointer-events-none"
-                        style={{ left: `calc(${trimEnd}% - 10px)`, zIndex: 6 }} />
+
+                    {/* Time labels */}
+                    <div className="flex justify-between text-[10px] text-gray-500 mt-1 px-1">
+                      <span>0s</span><span>15s</span><span>30s</span><span>45s</span><span>58s</span>
                     </div>
+
+                    {/* Preset buttons */}
                     <div className="flex gap-2 mt-3">
                       {[{ label: 'Full', start: 0, end: 100 }, { label: '0–30s', start: 0, end: 52 }, { label: '15–45s', start: 26, end: 78 }, { label: '30–58s', start: 52, end: 100 }].map(p => (
                         <button key={p.label} onClick={() => { setTrimStart(p.start); setTrimEnd(p.end) }}
