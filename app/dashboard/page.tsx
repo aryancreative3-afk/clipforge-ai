@@ -92,6 +92,19 @@ interface Scene {
   type: 'hook' | 'story' | 'cta'
   mediaUrl?: string
   customMediaUrl?: string
+  mediaType: 'video' | 'image'
+  durationSeconds: number
+  pexelsResults?: PexelsVideo[]
+  loadingMedia?: boolean
+}
+
+interface PexelsVideo {
+  id: number
+  thumbnail: string
+  bestUrl: string
+  duration: number
+  photographer: string
+  type: 'video' | 'image'
 }
 
 // ── VIDEO WALL DATA ───────────────────────────────────────────────────────────
@@ -393,6 +406,13 @@ export default function Dashboard() {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [renderId, setRenderId] = useState<string | null>(null)
+  const [renderBucket, setRenderBucket] = useState<string | null>(null)
+  const [renderRegion, setRenderRegion] = useState('us-east-1')
+  const [lambdaProgress, setLambdaProgress] = useState(0)
+  const [lambdaStatus, setLambdaStatus] = useState('')
+  const [lambdaSetupRequired, setLambdaSetupRequired] = useState(false)
+  const [missingVars, setMissingVars] = useState<string[]>([])
 
   // ── GENERATE ────────────────────────────────────────────────────────────────
   async function handleGenerate() {
@@ -415,7 +435,11 @@ export default function Dashboard() {
     try {
       const data = await callGenerateScript(idea, effectiveStyle)
       newScript = data.script || ''
-      newScenes = data.scenes || []
+      newScenes = (data.scenes || []).map((s: any) => ({
+        ...s,
+        mediaType: 'video' as const,
+        durationSeconds: s.durationSeconds || (s.type === 'hook' ? 3 : s.type === 'cta' ? 8 : 15),
+      }))
       newTitle = data.title || newTitle
     } catch (err: any) {
       newScript = `🎬 HOOK (0–3s)\n"${idea.slice(0, 60)} — most people have no idea."\n\n📖 STORY (3–50s)\nHere's what they don't tell you.\nThe truth has been hiding in plain sight.\nAnd once you see it, you can't unsee it.\n\nThis isn't opinion.\nThis is documented fact.\nThe evidence has existed for decades.\n\nYet nobody talks about it.\nUntil now.\n\n🎯 CTA (50–60s)\n"Follow for more stories they don't want you to know."`
@@ -433,25 +457,27 @@ export default function Dashboard() {
 
     // Steps 2–3: Fetch Pexels images for each scene
     setCurrentStep(2)
-    const pexelsKey = process.env.NEXT_PUBLIC_PEXELS_API_KEY
-    if (pexelsKey && newScenes.length > 0) {
+    // Fetch Pexels VIDEOS for each scene via our server route
+    if (newScenes.length > 0) {
       const enrichedScenes = await Promise.all(newScenes.map(async (scene) => {
         try {
-          const res = await fetch(
-            `https://api.pexels.com/v1/search?query=${encodeURIComponent(scene.searchQuery)}&per_page=6&orientation=portrait`,
-            { headers: { Authorization: pexelsKey } }
-          )
+          const res = await fetch('/api/pexels-video?query=' + encodeURIComponent(scene.searchQuery) + '&per_page=6')
           const data = await res.json()
-          const photo = data.photos?.[0]
-          return { ...scene, mediaUrl: photo?.src?.large || `https://picsum.photos/seed/${encodeURIComponent(scene.searchQuery)}/720/1280` }
+          const videos = data.videos || []
+          const best = videos[0]
+          return {
+            ...scene,
+            mediaUrl: best?.bestUrl || best?.thumbnail || '',
+            mediaType: best?.type || 'video',
+            pexelsResults: videos,
+          }
         } catch {
-          return { ...scene, mediaUrl: `https://picsum.photos/seed/${encodeURIComponent(scene.searchQuery)}/720/1280` }
+          return { ...scene, mediaUrl: '', mediaType: 'video' as const, pexelsResults: [] }
         }
       }))
       setScenes(enrichedScenes)
     } else {
-      // Use picsum placeholders if no Pexels key
-      setScenes(newScenes.map(s => ({ ...s, mediaUrl: `https://picsum.photos/seed/${encodeURIComponent(s.searchQuery)}/720/1280` })))
+      setScenes(newScenes)
     }
 
     setCurrentStep(3)
@@ -579,150 +605,97 @@ export default function Dashboard() {
     setAudioLoading(false)
   }
 
-  // ── VIDEO RENDER (Canvas-based browser render) ──────────────────────────────
+  // ── VIDEO RENDER via Remotion Lambda ─────────────────────────────────────────
   async function handleRenderVideo() {
     if (scenes.length === 0) return
     setRenderLoading(true)
     setRenderError('')
     setRenderedVideoUrl(null)
-    setRenderProgress(0)
+    setRenderProgress(5)
+    setLambdaStatus('Starting render on Lambda...')
+    setLambdaSetupRequired(false)
 
     try {
-      const canvas = document.createElement('canvas')
-      const isPortrait = aspectRatio === '9:16'
-      canvas.width = isPortrait ? 720 : aspectRatio === '1:1' ? 720 : 1280
-      canvas.height = isPortrait ? 1280 : aspectRatio === '1:1' ? 720 : 720
-      const ctx = canvas.getContext('2d')!
-      const stream = canvas.captureStream(30)
-
-      // Add audio track if available
-      let audioElement: HTMLAudioElement | null = null
-      if (generatedAudioUrl) {
-        audioElement = new Audio(generatedAudioUrl)
-        audioElement.play()
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' })
-      const chunks: Blob[] = []
-      mediaRecorder.ondataavailable = e => chunks.push(e.data)
-      mediaRecorder.start()
-
-      const sceneDuration = Math.floor(5800 / scenes.length) // total ~58s
-      
-      for (let i = 0; i < scenes.length; i++) {
-        const scene = scenes[i]
-        setRenderProgress(Math.round((i / scenes.length) * 80))
-        
-        // Load scene image
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve()
-          img.onerror = () => resolve()
-          img.src = scene.customMediaUrl || scene.mediaUrl || `https://picsum.photos/seed/${i}/720/1280`
-        })
-
-        // Animate this scene for sceneDuration ms
-        const startTime = Date.now()
-        const duration = sceneDuration
-
-        await new Promise<void>((resolve) => {
-          function drawFrame() {
-            const elapsed = Date.now() - startTime
-            const progress = Math.min(elapsed / duration, 1)
-            
-            // Ken Burns zoom effect
-            const zoom = 1 + progress * 0.05
-            ctx.clearRect(0, 0, canvas.width, canvas.height)
-            ctx.save()
-            ctx.translate(canvas.width / 2, canvas.height / 2)
-            ctx.scale(zoom, zoom)
-            ctx.translate(-canvas.width / 2, -canvas.height / 2)
-            
-            if (img.complete && img.naturalWidth > 0) {
-              // Draw image cover
-              const imgAspect = img.naturalWidth / img.naturalHeight
-              const canvasAspect = canvas.width / canvas.height
-              let sw, sh, sx, sy
-              if (imgAspect > canvasAspect) {
-                sh = img.naturalHeight; sw = sh * canvasAspect
-                sx = (img.naturalWidth - sw) / 2; sy = 0
-              } else {
-                sw = img.naturalWidth; sh = sw / canvasAspect
-                sx = 0; sy = (img.naturalHeight - sh) / 2
-              }
-              ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
-            } else {
-              // Gradient fallback
-              const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
-              grad.addColorStop(0, '#0a1628')
-              grad.addColorStop(1, '#1a0a28')
-              ctx.fillStyle = grad
-              ctx.fillRect(0, 0, canvas.width, canvas.height)
-            }
-            ctx.restore()
-
-            // Dark overlay at bottom for caption readability
-            const overlayGrad = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height)
-            overlayGrad.addColorStop(0, 'rgba(0,0,0,0)')
-            overlayGrad.addColorStop(1, 'rgba(0,0,0,0.8)')
-            ctx.fillStyle = overlayGrad
-            ctx.fillRect(0, canvas.height * 0.5, canvas.width, canvas.height * 0.5)
-
-            // Caption text
-            const fontSize = captionSize === 'large' ? canvas.width * 0.06 : captionSize === 'medium' ? canvas.width * 0.045 : canvas.width * 0.035
-            ctx.font = '900 ' + fontSize + 'px Impact, Arial Black, sans-serif'
-            ctx.fillStyle = captionColor
-            ctx.strokeStyle = 'rgba(0,0,0,0.9)'
-            ctx.lineWidth = fontSize * 0.12
-            ctx.textAlign = 'center'
-            const words = scene.text.split(' ')
-            const maxWidth = canvas.width * 0.85
-            const lines: string[] = []
-            let currentLine = ''
-            for (const word of words) {
-              const test = currentLine + word + ' '
-              if (ctx.measureText(test).width > maxWidth && currentLine) {
-                lines.push(currentLine.trim()); currentLine = word + ' '
-              } else currentLine = test
-            }
-            if (currentLine) lines.push(currentLine.trim())
-            const lineHeight = fontSize * 1.3
-            const totalHeight = lines.length * lineHeight
-            let textY = canvas.height * 0.82 - totalHeight / 2
-            for (const line of lines) {
-              ctx.strokeText(line, canvas.width / 2, textY)
-              ctx.fillText(line, canvas.width / 2, textY)
-              textY += lineHeight
-            }
-
-            // Scene indicator
-            ctx.font = 'bold ' + (canvas.width * 0.025) + 'px Arial'
-            ctx.fillStyle = 'rgba(255,255,255,0.5)'
-            ctx.textAlign = 'right'
-            ctx.fillText(scene.timestamp, canvas.width - 20, 35)
-
-            if (progress < 1) requestAnimationFrame(drawFrame)
-            else resolve()
-          }
-          drawFrame()
-        })
-      }
-
-      setRenderProgress(90)
-      mediaRecorder.stop()
-      
-      await new Promise<void>(resolve => {
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' })
-          const url = URL.createObjectURL(blob)
-          setRenderedVideoUrl(url)
-          resolve()
-        }
+      // Trigger Lambda render
+      const res = await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenes: scenes.map(s => ({
+            id: s.id,
+            text: s.text,
+            mediaUrl: s.customMediaUrl || s.mediaUrl || '',
+            mediaType: s.mediaType || 'video',
+            type: s.type,
+            durationSeconds: s.durationSeconds || 10,
+            searchQuery: s.searchQuery,
+          })),
+          audioUrl: generatedAudioUrl || '',
+          captionStyle,
+          captionColor,
+          captionSize,
+          brandColor,
+          brandFont,
+          title: ytTitle || idea,
+        }),
       })
 
-      setRenderProgress(100)
-      if (audioElement) audioElement.pause()
+      const data = await res.json()
+
+      // Lambda not configured yet
+      if (data.setupRequired) {
+        setLambdaSetupRequired(true)
+        setMissingVars(data.missingVars || [])
+        setRenderError('Remotion Lambda setup required')
+        setRenderLoading(false)
+        return
+      }
+
+      if (!res.ok) throw new Error(data.error || 'Render failed')
+
+      const { renderId: rId, bucketName, region } = data
+      setRenderId(rId)
+      setRenderBucket(bucketName)
+      setRenderRegion(region)
+      setRenderProgress(10)
+      setLambdaStatus('Render queued on AWS Lambda...')
+
+      // Poll for progress
+      let attempts = 0
+      const maxAttempts = 120 // 2 minutes max
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 2000))
+        attempts++
+
+        const pollRes = await fetch(
+          '/api/render?renderId=' + rId + '&bucketName=' + bucketName + '&region=' + region
+        )
+        const poll = await pollRes.json()
+
+        if (poll.fatalErrorEncountered) {
+          throw new Error(poll.errors?.[0]?.message || 'Lambda render failed')
+        }
+
+        const progress = Math.round((poll.overallProgress || 0) * 90) + 10
+        setRenderProgress(Math.min(progress, 99))
+        setLambdaStatus(
+          poll.done ? 'Finalizing...' :
+          progress < 30 ? 'Compositing scenes...' :
+          progress < 60 ? 'Encoding video...' :
+          progress < 85 ? 'Adding audio...' :
+          'Almost done...'
+        )
+
+        if (poll.done && poll.outputFile) {
+          setRenderedVideoUrl(poll.outputFile)
+          setRenderProgress(100)
+          setLambdaStatus('Done!')
+          break
+        }
+      }
+
+      if (attempts >= maxAttempts) throw new Error('Render timed out. Please try again.')
+
     } catch (err: any) {
       setRenderError(err?.message || 'Render failed. Please try again.')
     }
@@ -1161,74 +1134,136 @@ export default function Dashboard() {
                             ) : (
                               scenes.map((scene, idx) => (
                                 <div key={scene.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                                  <div className="flex items-stretch">
-                                    {/* Scene thumbnail */}
-                                    <div className="relative w-16 shrink-0">
-                                      {scene.mediaUrl ? (
-                                        <img src={scene.mediaUrl} alt="" className="w-full h-full object-cover" />
-                                      ) : (
-                                        <div className="w-full h-full bg-gradient-to-b from-[#00c8ff]/20 to-[#7b2fff]/20 flex items-center justify-center text-2xl">🎬</div>
-                                      )}
-                                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-all cursor-pointer"
-                                        onClick={() => {
-                                          const url = prompt('Paste image URL for this scene:')
-                                          if (url) setScenes(prev => prev.map((s, i) => i === idx ? { ...s, customMediaUrl: url, mediaUrl: url } : s))
-                                        }}>
-                                        <span className="text-white text-xs font-bold">Swap</span>
-                                      </div>
-                                    </div>
-                                    {/* Scene content */}
-                                    <div className="flex-1 p-2.5">
-                                      <div className="flex items-center gap-2 mb-1.5">
-                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${scene.type === 'hook' ? 'bg-[#00c8ff]/20 text-[#00c8ff]' : scene.type === 'cta' ? 'bg-[#ff6b35]/20 text-[#ff6b35]' : 'bg-[#7b2fff]/20 text-[#7b2fff]'}`}>
-                                          {scene.type.toUpperCase()}
-                                        </span>
-                                        <span className="text-[9px] text-gray-500">{scene.timestamp}</span>
-                                        <span className="ml-auto text-[9px] text-gray-600">Scene {idx + 1}</span>
-                                      </div>
-                                      <textarea
-                                        value={scene.text}
-                                        onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, text: e.target.value } : s))}
-                                        rows={2}
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-300 resize-none focus:outline-none focus:border-[#00c8ff]/50 transition-colors mb-1.5"
+                                  {/* Scene header */}
+                                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${scene.type === 'hook' ? 'bg-[#00c8ff]/20 text-[#00c8ff]' : scene.type === 'cta' ? 'bg-[#ff6b35]/20 text-[#ff6b35]' : 'bg-[#7b2fff]/20 text-[#7b2fff]'}`}>
+                                      {scene.type.toUpperCase()}
+                                    </span>
+                                    <span className="text-[9px] text-gray-500 flex-1">{scene.timestamp}</span>
+                                    {/* Duration control */}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[9px] text-gray-500">⏱</span>
+                                      <input
+                                        type="number"
+                                        min={2}
+                                        max={30}
+                                        value={scene.durationSeconds || 10}
+                                        onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, durationSeconds: Math.max(2, Math.min(30, +e.target.value)) } : s))}
+                                        className="w-12 bg-white/10 border border-white/20 rounded-lg px-1.5 py-0.5 text-[10px] text-white text-center focus:outline-none focus:border-[#00c8ff]/50"
                                       />
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[9px] text-gray-500">🔍</span>
-                                        <input
-                                          value={scene.searchQuery}
-                                          onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, searchQuery: e.target.value } : s))}
-                                          placeholder="search query for footage..."
-                                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-400 focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
-                                        />
-                                        <button
-                                          onClick={async () => {
-                                            const pexelsKey = process.env.NEXT_PUBLIC_PEXELS_API_KEY
-                                            if (!pexelsKey) {
-                                              setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: `https://picsum.photos/seed/${encodeURIComponent(scene.searchQuery + Date.now())}/720/1280` } : s))
-                                              return
-                                            }
-                                            try {
-                                              const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(scene.searchQuery)}&per_page=6&orientation=portrait`, { headers: { Authorization: pexelsKey } })
-                                              const data = await res.json()
-                                              const photos = data.photos || []
-                                              if (photos.length > 0) {
-                                                const random = photos[Math.floor(Math.random() * photos.length)]
-                                                setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: random.src.large, customMediaUrl: undefined } : s))
-                                              }
-                                            } catch {}
-                                          }}
-                                          className="text-[9px] bg-[#00c8ff]/10 border border-[#00c8ff]/30 text-[#00c8ff] px-2 py-1 rounded-lg hover:bg-[#00c8ff]/20 transition-all whitespace-nowrap">
-                                          🔄 Refresh
-                                        </button>
-                                      </div>
+                                      <span className="text-[9px] text-gray-500">s</span>
                                     </div>
+                                    <button onClick={() => setScenes(prev => prev.filter((_, i) => i !== idx))}
+                                      className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
+                                  </div>
+
+                                  {/* Video picker row */}
+                                  <div className="px-3 pb-2">
+                                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                                      {/* Current selected */}
+                                      <div className="relative shrink-0 w-14 h-20 rounded-lg overflow-hidden border-2 border-[#00c8ff]">
+                                        {scene.mediaUrl ? (
+                                          <video
+                                            src={scene.mediaUrl}
+                                            className="w-full h-full object-cover"
+                                            muted
+                                            loop
+                                            autoPlay
+                                            playsInline
+                                            onError={e => { (e.target as HTMLVideoElement).style.display = 'none' }}
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full bg-gradient-to-b from-[#00c8ff]/20 to-[#7b2fff]/20 flex items-center justify-center text-xl">🎬</div>
+                                        )}
+                                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[8px] text-[#00c8ff] text-center py-0.5 font-bold">ACTIVE</div>
+                                      </div>
+
+                                      {/* Pexels video results */}
+                                      {(scene.pexelsResults || []).map((v, vi) => (
+                                        <div
+                                          key={v.id}
+                                          onClick={() => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: v.bestUrl || v.thumbnail, mediaType: v.type, customMediaUrl: undefined } : s))}
+                                          className="relative shrink-0 w-14 h-20 rounded-lg overflow-hidden border border-white/20 cursor-pointer hover:border-[#00c8ff]/60 transition-all group">
+                                          <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
+                                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                                            <span className="text-white text-lg opacity-0 group-hover:opacity-100 transition-all">▶</span>
+                                          </div>
+                                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[7px] text-gray-300 text-center py-0.5">{v.duration}s</div>
+                                        </div>
+                                      ))}
+
+                                      {/* Upload custom */}
+                                      <label className="shrink-0 w-14 h-20 rounded-lg border border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-[#00c8ff]/40 transition-all gap-1">
+                                        <span className="text-lg">📁</span>
+                                        <span className="text-[7px] text-gray-500 text-center px-1">Upload</span>
+                                        <input type="file" accept="video/*,image/*" className="hidden"
+                                          onChange={e => {
+                                            const file = e.target.files?.[0]
+                                            if (!file) return
+                                            const url = URL.createObjectURL(file)
+                                            const type = file.type.startsWith('video') ? 'video' : 'image'
+                                            setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: url, mediaType: type, customMediaUrl: url } : s))
+                                          }}
+                                        />
+                                      </label>
+
+                                      {/* Refresh from Pexels */}
+                                      <button
+                                        onClick={async () => {
+                                          setScenes(prev => prev.map((s, i) => i === idx ? { ...s, loadingMedia: true } : s))
+                                          try {
+                                            const res = await fetch('/api/pexels-video?query=' + encodeURIComponent(scene.searchQuery) + '&per_page=6')
+                                            const data = await res.json()
+                                            const videos = data.videos || []
+                                            const best = videos[0]
+                                            setScenes(prev => prev.map((s, i) => i === idx ? {
+                                              ...s,
+                                              mediaUrl: best?.bestUrl || best?.thumbnail || s.mediaUrl,
+                                              mediaType: best?.type || 'video',
+                                              pexelsResults: videos,
+                                              loadingMedia: false,
+                                            } : s))
+                                          } catch {
+                                            setScenes(prev => prev.map((s, i) => i === idx ? { ...s, loadingMedia: false } : s))
+                                          }
+                                        }}
+                                        className="shrink-0 w-14 h-20 rounded-lg border border-dashed border-[#00c8ff]/30 flex flex-col items-center justify-center hover:border-[#00c8ff]/60 transition-all gap-1">
+                                        {scene.loadingMedia ? (
+                                          <span className="text-[#00c8ff] animate-spin text-lg">⟳</span>
+                                        ) : (
+                                          <>
+                                            <span className="text-lg">🔄</span>
+                                            <span className="text-[7px] text-[#00c8ff] text-center px-1">More</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+
+                                    {/* Search query */}
+                                    <div className="flex items-center gap-1.5 mt-2">
+                                      <input
+                                        value={scene.searchQuery}
+                                        onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, searchQuery: e.target.value } : s))}
+                                        placeholder="search footage..."
+                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-400 focus:outline-none focus:border-[#00c8ff]/50"
+                                      />
+                                    </div>
+
+                                    {/* Scene text */}
+                                    <textarea
+                                      value={scene.text}
+                                      onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, text: e.target.value } : s))}
+                                      rows={2}
+                                      placeholder="Caption text for this scene..."
+                                      className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-300 resize-none focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
+                                    />
                                   </div>
                                 </div>
                               ))
                             )}
                             {scenes.length > 0 && (
                               <button
-                                onClick={() => setScenes(prev => [...prev, { id: Date.now(), timestamp: 'custom', text: 'New scene text', searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'story' }])}
+                                onClick={() => setScenes(prev => [...prev, { id: Date.now(), timestamp: 'custom', text: 'New scene', searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'story', mediaType: 'video', durationSeconds: 10 }])}
                                 className="w-full py-2 border border-dashed border-white/20 rounded-xl text-xs text-gray-400 hover:border-[#00c8ff]/40 hover:text-[#00c8ff] transition-all">
                                 + Add Scene
                               </button>
@@ -1346,21 +1381,50 @@ export default function Dashboard() {
                               <p className="text-green-400">✅ Captions configured</p>
                             </div>
 
-                            {renderLoading && (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-[#00c8ff] animate-pulse">🎬 Rendering video...</span>
-                                  <span className="text-white font-bold">{renderProgress}%</span>
+                            {/* Lambda setup guide */}
+                            {lambdaSetupRequired && (
+                              <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl space-y-3">
+                                <p className="text-xs font-black text-yellow-400">⚙️ Remotion Lambda Setup Required</p>
+                                <p className="text-[10px] text-gray-400">Add these to Vercel → Settings → Environment Variables:</p>
+                                <div className="space-y-1.5">
+                                  {missingVars.map(v => (
+                                    <div key={v} className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                                      <span className="text-red-400 text-[9px]">❌</span>
+                                      <code className="text-[10px] text-red-300 font-mono">{v}</code>
+                                    </div>
+                                  ))}
                                 </div>
-                                <div className="w-full bg-white/10 rounded-full h-2">
-                                  <div className="h-2 rounded-full bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] transition-all duration-300"
-                                    style={{ width: `${renderProgress}%` }} />
+                                <div className="text-[10px] text-gray-500 space-y-1 border-t border-white/10 pt-2">
+                                  <p className="font-semibold text-white">Setup steps:</p>
+                                  <p>1. Install Remotion CLI: <code className="text-[#00c8ff]">npx remotion lambda sites create</code></p>
+                                  <p>2. Deploy function: <code className="text-[#00c8ff]">npx remotion lambda functions deploy</code></p>
+                                  <p>3. Copy the output values to Vercel env vars</p>
+                                  <a href="https://www.remotion.dev/docs/lambda/setup" target="_blank" rel="noopener"
+                                    className="text-[#00c8ff] underline block mt-1">📖 Full setup guide →</a>
                                 </div>
-                                <p className="text-[10px] text-gray-500">Drawing {Math.ceil(renderProgress / (100 / scenes.length))} of {scenes.length} scenes...</p>
                               </div>
                             )}
 
-                            {renderError && (
+                            {renderLoading && (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-[#00c8ff] animate-pulse">🚀 {lambdaStatus}</span>
+                                  <span className="text-white font-bold">{renderProgress}%</span>
+                                </div>
+                                <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
+                                  <div className="h-3 rounded-full bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] transition-all duration-500"
+                                    style={{ width: `${renderProgress}%` }} />
+                                </div>
+                                <div className="grid grid-cols-4 gap-1 text-center">
+                                  {['Queue', 'Compose', 'Encode', 'Done'].map((s, i) => (
+                                    <div key={s} className={`text-[9px] py-1 rounded ${renderProgress > i * 25 ? 'text-[#00c8ff]' : 'text-gray-600'}`}>{s}</div>
+                                  ))}
+                                </div>
+                                <p className="text-[10px] text-gray-500 text-center">Rendering {scenes.length} scenes on AWS Lambda...</p>
+                              </div>
+                            )}
+
+                            {renderError && !lambdaSetupRequired && (
                               <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
                                 ⚠️ {renderError}
                               </div>
@@ -1369,22 +1433,22 @@ export default function Dashboard() {
                             {renderedVideoUrl && !renderLoading && (
                               <div className="space-y-3">
                                 <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
-                                  <p className="text-xs text-green-400 font-bold mb-2">✅ Video rendered!</p>
+                                  <p className="text-xs text-green-400 font-bold mb-2">✅ Video rendered on Lambda!</p>
                                   <video src={renderedVideoUrl} controls className="w-full rounded-xl" style={{ maxHeight: '300px' }} />
                                 </div>
-                                <a href={renderedVideoUrl} download="clipforge-video.webm"
+                                <a href={renderedVideoUrl} download="clipforge-short.mp4"
                                   className="w-full py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all">
-                                  ⬇️ Download Video (.webm)
+                                  ⬇️ Download MP4
                                 </a>
-                                <p className="text-[10px] text-gray-600 text-center">WebM format · Compatible with YouTube, TikTok, Instagram</p>
+                                <p className="text-[10px] text-gray-600 text-center">H.264 MP4 · 1080×1920 · Ready for YouTube Shorts, TikTok, Instagram Reels</p>
                               </div>
                             )}
 
-                            {!renderedVideoUrl && !renderLoading && (
+                            {!renderedVideoUrl && !renderLoading && !lambdaSetupRequired && (
                               <button onClick={handleRenderVideo} disabled={scenes.length === 0}
                                 className="w-full py-4 rounded-xl bg-gradient-to-r from-[#7b2fff] to-[#ff6b35] text-white font-black text-base hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                                 style={{ boxShadow: '0 0 30px rgba(123,47,255,0.3)' }}>
-                                🎬 Render Video Now
+                                🚀 Render on Lambda
                               </button>
                             )}
                           </div>
