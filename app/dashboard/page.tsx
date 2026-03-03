@@ -90,7 +90,10 @@ function startPrev(v: Voice) {
     window.speechSynthesis.speak(u)
   }
 }
-  function stopPrev(){window.speechSynthesis.cancel();setPrevId(null)}
+  function stopPrev(){
+  if(typeof window!=='undefined'&&window.speechSynthesis) window.speechSynthesis.cancel()
+  setPrevId(null)
+}
 
   async function generate(){
     if(!topic.trim())return
@@ -249,12 +252,12 @@ function startPrev(v: Voice) {
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">AI voice — hover to preview</p>
+              <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">AI voice — tap or click to preview</p>
               <div className="grid grid-cols-2 gap-2">
                 {VOICES.map(v=>{
                   const sel=voice.id===v.id,prev=prevId===v.id
                   return(
-                    <div key={v.id} onClick={()=>{setVoice(v);stopPrev()}}  onMouseEnter={()=>startPrev(v)} onTouchStart={()=>startPrev(v)} onMouseLeave={stopPrev}
+                    <div key={v.id} onTouchStart={(e)=>{e.preventDefault();if(prevId===v.id){stopPrev()}else{startPrev(v)}}}
                       className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-150 border select-none"
                       style={{borderColor:sel?v.color:prev?v.color+'55':'rgba(255,255,255,0.07)',background:sel?v.color+'13':prev?v.color+'08':'rgba(255,255,255,0.02)',transform:prev?'translateY(-1px)':'none',boxShadow:sel?'0 0 20px '+v.color+'28':'none'}}>
                       <div className="relative shrink-0">
@@ -270,6 +273,7 @@ function startPrev(v: Voice) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-white/85">{v.name}</p>
+                        <button onClick={e=>{e.stopPropagation();if(prevId===v.id){stopPrev()}else{startPrev(v)}}} className="text-[9px] px-1.5 py-0.5 rounded-md mt-0.5 transition-all" style={{background:prevId===v.id?v.color+'30':'rgba(255,255,255,0.07)',color:prevId===v.id?v.color:'rgba(255,255,255,0.4)',border:'1px solid '+(prevId===v.id?v.color+'50':'rgba(255,255,255,0.1)')}}>{prevId===v.id?'■ stop':'▶ play'}</button>
                         <p className="text-[10px] text-white/30 mt-0.5">{v.accent} · {v.style}</p>
                       </div>
                       <div className="flex items-center gap-px shrink-0" style={{height:14}}>
@@ -280,9 +284,7 @@ function startPrev(v: Voice) {
                 })}
               </div>
               <p className="text-[10px] text-white/18 mt-2 text-center">
-  {'ontouchstart' in window
-    ? 'Tap to preview · Tap again to stop'
-    : 'Hover to preview · Generate = real ElevenLabs AI'}
+  {'Tap or click to preview · Tap again to stop'}
 </p>
             </div>
             <div className="flex gap-3">
