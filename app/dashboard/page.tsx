@@ -391,6 +391,7 @@ export default function Dashboard() {
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null)
   const [renderError, setRenderError] = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   // ── GENERATE ────────────────────────────────────────────────────────────────
@@ -1439,20 +1440,44 @@ export default function Dashboard() {
 
                         {/* Voice grid */}
                         <div>
-                          <label className="text-xs text-gray-400 font-semibold block mb-2">🎙️ Choose Voice</label>
+                          <label className="text-xs text-gray-400 font-semibold block mb-2">🎙️ Choose Voice — hover to preview</label>
                           <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                             {elevenLabsVoices.map(v => (
-                              <button key={v.id} onClick={() => setSelectedElevenVoice(v)}
-                                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${selectedElevenVoice.id === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : 'border-white/10 hover:border-white/30'}`}>
-                                <span className="text-lg shrink-0">{v.emoji}</span>
+                              <button key={v.id}
+                                onClick={() => setSelectedElevenVoice(v)}
+                                onMouseEnter={() => {
+                                  if (previewingVoiceId === v.id) return
+                                  setPreviewingVoiceId(v.id)
+                                  window.speechSynthesis.cancel()
+                                  const utter = new SpeechSynthesisUtterance('Hi! I am ' + v.name + '. ' + v.style + ' voice from ' + v.accent + '.')
+                                  utter.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : 'en-US'
+                                  utter.rate = 1.0
+                                  utter.pitch = v.gender === 'female' ? 1.2 : 0.85
+                                  utter.onend = () => setPreviewingVoiceId(null)
+                                  window.speechSynthesis.speak(utter)
+                                }}
+                                onMouseLeave={() => {
+                                  window.speechSynthesis.cancel()
+                                  setPreviewingVoiceId(null)
+                                }}
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all relative ${selectedElevenVoice.id === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : previewingVoiceId === v.id ? 'border-[#7b2fff] bg-[#7b2fff]/10' : 'border-white/10 hover:border-white/30'}`}>
+                                <span className="text-lg shrink-0 relative">
+                                  {v.emoji}
+                                  {previewingVoiceId === v.id && (
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#7b2fff] rounded-full animate-ping" />
+                                  )}
+                                </span>
                                 <div className="min-w-0">
                                   <p className="text-xs font-bold text-white">{v.name}</p>
                                   <p className="text-[9px] text-gray-500">{v.accent} · {v.style}</p>
                                 </div>
-                                {selectedElevenVoice.id === v.id && <span className="ml-auto text-[#00c8ff] text-xs shrink-0">✓</span>}
+                                <span className="ml-auto text-xs shrink-0">
+                                  {previewingVoiceId === v.id ? '🔊' : selectedElevenVoice.id === v.id ? <span className="text-[#00c8ff]">✓</span> : ''}
+                                </span>
                               </button>
                             ))}
                           </div>
+                          <p className="text-[10px] text-gray-600 mt-1.5">* Preview uses browser speech. Real generation uses ElevenLabs AI voices.</p>
                         </div>
 
                         {/* Voice settings */}
