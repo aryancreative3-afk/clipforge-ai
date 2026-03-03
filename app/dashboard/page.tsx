@@ -555,7 +555,8 @@ export default function Dashboard() {
     setAudioError('')
     setGeneratedAudioUrl(null)
     try {
-      const cleanText = script.replace(/🎬 HOOK.*|📖 STORY.*|🎯 CTA.*|\(.*?\)/g, '').trim()
+      const cleanText = script.replace(/[🎬📖🎯].{0,10}\(.*?\)/g, '').replace(/^\s*[
+]/gm, '').trim()
       const dataUrl = await callGenerateVoice(cleanText, selectedElevenVoice.id, {
         stability: voiceStability,
         similarityBoost: voiceSimilarity,
@@ -563,6 +564,16 @@ export default function Dashboard() {
         speed: voiceSpeedEl,
       })
       setGeneratedAudioUrl(dataUrl)
+      // Auto-play the generated audio
+      setTimeout(() => {
+        const audio = new Audio(dataUrl)
+        audio.play().catch(() => {})
+      }, 300)
+      // Auto-navigate to Video tab → Render section
+      setTimeout(() => {
+        setActiveEditorTab('generate')
+        setActiveSceneTab('render')
+      }, 800)
     } catch (err: any) {
       setAudioError(err?.message || 'Voice generation failed. Check ELEVENLABS_API_KEY in Vercel settings.')
     }
@@ -1440,44 +1451,59 @@ export default function Dashboard() {
 
                         {/* Voice grid */}
                         <div>
-                          <label className="text-xs text-gray-400 font-semibold block mb-2">🎙️ Choose Voice — hover to preview</label>
-                          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                          <label className="text-xs text-gray-400 font-semibold block mb-2">🎙️ Choose Voice — click ▶ to preview</label>
+                          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
                             {elevenLabsVoices.map(v => (
-                              <button key={v.id}
-                                onClick={() => setSelectedElevenVoice(v)}
-                                onMouseEnter={() => {
-                                  if (previewingVoiceId === v.id) return
-                                  setPreviewingVoiceId(v.id)
-                                  window.speechSynthesis.cancel()
-                                  const utter = new SpeechSynthesisUtterance('Hi! I am ' + v.name + '. ' + v.style + ' voice from ' + v.accent + '.')
-                                  utter.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : 'en-US'
-                                  utter.rate = 1.0
-                                  utter.pitch = v.gender === 'female' ? 1.2 : 0.85
-                                  utter.onend = () => setPreviewingVoiceId(null)
-                                  window.speechSynthesis.speak(utter)
-                                }}
-                                onMouseLeave={() => {
-                                  window.speechSynthesis.cancel()
-                                  setPreviewingVoiceId(null)
-                                }}
-                                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all relative ${selectedElevenVoice.id === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : previewingVoiceId === v.id ? 'border-[#7b2fff] bg-[#7b2fff]/10' : 'border-white/10 hover:border-white/30'}`}>
+                              <div key={v.id}
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all relative cursor-pointer ${selectedElevenVoice.id === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : previewingVoiceId === v.id ? 'border-[#7b2fff] bg-[#7b2fff]/10' : 'border-white/10 hover:border-white/20'}`}
+                                onClick={() => {
+                                  setSelectedElevenVoice(v)
+                                }}>
+                                {/* Emoji + ping */}
                                 <span className="text-lg shrink-0 relative">
                                   {v.emoji}
                                   {previewingVoiceId === v.id && (
                                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#7b2fff] rounded-full animate-ping" />
                                   )}
                                 </span>
-                                <div className="min-w-0">
+                                {/* Name */}
+                                <div className="min-w-0 flex-1">
                                   <p className="text-xs font-bold text-white">{v.name}</p>
                                   <p className="text-[9px] text-gray-500">{v.accent} · {v.style}</p>
                                 </div>
-                                <span className="ml-auto text-xs shrink-0">
-                                  {previewingVoiceId === v.id ? '🔊' : selectedElevenVoice.id === v.id ? <span className="text-[#00c8ff]">✓</span> : ''}
-                                </span>
-                              </button>
+                                {/* Preview button */}
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (previewingVoiceId === v.id) {
+                                      window.speechSynthesis.cancel()
+                                      setPreviewingVoiceId(null)
+                                      return
+                                    }
+                                    window.speechSynthesis.cancel()
+                                    setPreviewingVoiceId(v.id)
+                                    const utter = new SpeechSynthesisUtterance(
+                                      'Hey! I am ' + v.name + '. I can narrate your YouTube Short in a ' + v.style.toLowerCase() + ' style.'
+                                    )
+                                    utter.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : v.accent === 'Indian' ? 'en-IN' : 'en-US'
+                                    utter.rate = 1.0
+                                    utter.pitch = v.gender === 'female' ? 1.15 : 0.85
+                                    utter.volume = 1.0
+                                    utter.onend = () => setPreviewingVoiceId(null)
+                                    utter.onerror = () => setPreviewingVoiceId(null)
+                                    window.speechSynthesis.speak(utter)
+                                  }}
+                                  className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all text-xs ${previewingVoiceId === v.id ? 'bg-[#7b2fff] text-white' : 'bg-white/10 text-gray-400 hover:bg-[#00c8ff]/20 hover:text-[#00c8ff]'}`}>
+                                  {previewingVoiceId === v.id ? '⏹' : '▶'}
+                                </button>
+                                {/* Selected check */}
+                                {selectedElevenVoice.id === v.id && previewingVoiceId !== v.id && (
+                                  <span className="shrink-0 text-[#00c8ff] text-xs">✓</span>
+                                )}
+                              </div>
                             ))}
                           </div>
-                          <p className="text-[10px] text-gray-600 mt-1.5">* Preview uses browser speech. Real generation uses ElevenLabs AI voices.</p>
+                          <p className="text-[10px] text-gray-600 mt-1.5">▶ = browser preview &nbsp;|&nbsp; Generate button uses real ElevenLabs AI</p>
                         </div>
 
                         {/* Voice settings */}
