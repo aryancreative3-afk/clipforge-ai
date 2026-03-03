@@ -754,7 +754,7 @@ export default function Dashboard() {
   const currentAspect = aspectRatios.find(a => a.ratio === aspectRatio) || aspectRatios[0]
   const scoreColor = viralScore >= 90 ? '#00ff88' : viralScore >= 75 ? '#00c8ff' : '#ffaa00'
 
-  const editorTabs: Array<{ id: 'video' | 'generate' | 'captions' | 'voice' | 'language' | 'media' | 'brand' | 'thumbnail' | 'export'; label: string }> = [
+  const editorTabs = [
     { id: 'video', label: '🎬 Script' },
     { id: 'generate', label: '🎥 Video' },
     { id: 'captions', label: '💬 Captions' },
@@ -1431,30 +1431,87 @@ export default function Dashboard() {
                     {/* VOICE */}
                     {activeEditorTab === 'voice' && (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-2">
-                          {voices.map(v => (
-                            <button key={v.id} onClick={() => setSelectedVoice(v.id)}
-                              className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${selectedVoice === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : 'border-white/10'}`}>
-                              <span>{v.gender === 'female' ? '👩' : '👨'}</span>
-                              <span className="text-xs font-semibold">{v.id}</span>
-                              {selectedVoice === v.id && <span className="ml-auto text-[#00c8ff] text-xs">✓</span>}
-                            </button>
+                        {/* ElevenLabs banner */}
+                        <div className="p-3 bg-[#00c8ff]/5 border border-[#00c8ff]/20 rounded-xl flex items-start gap-2">
+                          <span className="shrink-0">💡</span>
+                          <p className="text-xs text-[#00c8ff]">Powered by <strong>ElevenLabs</strong>. Add <strong>ELEVENLABS_API_KEY</strong> in Vercel → Settings → Environment Variables for real AI voices.</p>
+                        </div>
+
+                        {/* Voice grid */}
+                        <div>
+                          <label className="text-xs text-gray-400 font-semibold block mb-2">🎙️ Choose Voice</label>
+                          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                            {elevenLabsVoices.map(v => (
+                              <button key={v.id} onClick={() => setSelectedElevenVoice(v)}
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${selectedElevenVoice.id === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : 'border-white/10 hover:border-white/30'}`}>
+                                <span className="text-lg shrink-0">{v.emoji}</span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-white">{v.name}</p>
+                                  <p className="text-[9px] text-gray-500">{v.accent} · {v.style}</p>
+                                </div>
+                                {selectedElevenVoice.id === v.id && <span className="ml-auto text-[#00c8ff] text-xs shrink-0">✓</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Voice settings */}
+                        <div className="space-y-3">
+                          <label className="text-xs text-gray-400 font-semibold block">🎛️ Voice Settings</label>
+                          {[
+                            { label: 'Stability', value: voiceStability, set: setVoiceStability, hint: 'Lower = expressive', color: '#00c8ff' },
+                            { label: 'Similarity', value: voiceSimilarity, set: setVoiceSimilarity, hint: 'Higher = truer voice', color: '#7b2fff' },
+                            { label: 'Style', value: voiceStyleAmount, set: setVoiceStyleAmount, hint: 'More = dramatic', color: '#ff6b35' },
+                          ].map(ctrl => (
+                            <div key={ctrl.label}>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-gray-400">{ctrl.label}</span>
+                                <span className="text-gray-500 text-[10px]">{ctrl.hint}</span>
+                              </div>
+                              <input type="range" min="0" max="1" step="0.05" value={ctrl.value}
+                                onChange={e => ctrl.set(+e.target.value)}
+                                className="w-full" style={{ accentColor: ctrl.color }} />
+                            </div>
                           ))}
+                          <div>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-gray-400">Speed</span>
+                              <span className="text-white font-semibold">{voiceSpeedEl}x</span>
+                            </div>
+                            <input type="range" min="0.7" max="1.3" step="0.05" value={voiceSpeedEl}
+                              onChange={e => setVoiceSpeedEl(+e.target.value)}
+                              className="w-full" style={{ accentColor: '#00ff88' }} />
+                          </div>
                         </div>
-                        <div>
-                          <div className="flex justify-between text-xs mb-1.5"><span className="text-gray-400">Pitch</span><span className="font-semibold">{voicePitch}%</span></div>
-                          <input type="range" min="0" max="100" value={voicePitch} onChange={e => setVoicePitch(+e.target.value)} className="w-full" style={{ accentColor: '#00c8ff' }} />
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-xs mb-1.5"><span className="text-gray-400">Speed</span><span className="font-semibold">{voiceSpeed}%</span></div>
-                          <input type="range" min="0" max="100" value={voiceSpeed} onChange={e => setVoiceSpeed(+e.target.value)} className="w-full" style={{ accentColor: '#7b2fff' }} />
-                        </div>
-                        <button onClick={handleVoicePreview}
-                          className={`w-full py-2.5 rounded-xl text-xs font-bold border transition-all ${isSpeaking ? 'border-[#00c8ff] bg-[#00c8ff]/10 text-[#00c8ff]' : 'border-white/10 text-gray-300 hover:border-[#00c8ff]/40'}`}>
-                          {isSpeaking ? '⏹ Stop Preview' : '🔊 Preview Voice'}
+
+                        {/* Generate button */}
+                        <button onClick={handleGenerateVoice} disabled={audioLoading || !script}
+                          className="w-full py-3 rounded-xl bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] text-black font-black text-sm hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                          {audioLoading ? '⏳ Generating...' : ('🎙️ Generate with ' + selectedElevenVoice.name)}
                         </button>
-                        <div className="p-3 bg-[#00c8ff]/5 border border-[#00c8ff]/20 rounded-xl text-xs text-[#00c8ff]">
-                          💡 Preview uses browser speech synthesis. Final export uses professional AI voices.
+
+                        {audioError && (
+                          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">⚠️ {audioError}</div>
+                        )}
+
+                        {generatedAudioUrl && (
+                          <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-xl space-y-2">
+                            <p className="text-xs text-green-400 font-bold">✅ Voice ready — {selectedElevenVoice.name}</p>
+                            <audio src={generatedAudioUrl} controls className="w-full h-8" />
+                            <a href={generatedAudioUrl} download="clipforge-voice.mp3"
+                              className="w-full py-1.5 border border-green-500/30 text-green-400 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-green-500/10 transition-all">
+                              ⬇️ Download MP3
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Browser preview fallback */}
+                        <div className="border-t border-white/10 pt-3">
+                          <p className="text-[10px] text-gray-600 mb-2">Or use browser preview (no API key needed):</p>
+                          <button onClick={handleVoicePreview}
+                            className={`w-full py-2 rounded-xl text-xs font-bold border transition-all ${isSpeaking ? 'border-[#00c8ff] bg-[#00c8ff]/10 text-[#00c8ff]' : 'border-white/10 text-gray-500 hover:border-white/30'}`}>
+                            {isSpeaking ? '⏹ Stop' : '🔊 Browser Preview'}
+                          </button>
                         </div>
                       </div>
                     )}
