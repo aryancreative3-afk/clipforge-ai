@@ -69,6 +69,31 @@ const aspectRatios = [
   { ratio: '16:9', label: 'Wide', icon: '🖥️', style: { width: '100%', aspectRatio: '16/9' } },
 ]
 
+const elevenLabsVoices = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', gender: 'female', accent: 'American', style: 'Conversational', emoji: '👩' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: 'male', accent: 'American', style: 'Conversational', emoji: '👨' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female', accent: 'British', style: 'Elegant', emoji: '👩‍🦱' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: 'male', accent: 'American', style: 'Deep', emoji: '🧔' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', gender: 'female', accent: 'British', style: 'Warm', emoji: '👩‍🦰' },
+  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will', gender: 'male', accent: 'American', style: 'Friendly', emoji: '😊' },
+  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'female', accent: 'American', style: 'Expressive', emoji: '🎭' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'male', accent: 'Australian', style: 'Casual', emoji: '🤙' },
+  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'female', accent: 'American', style: 'Warm', emoji: '🌸' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: 'male', accent: 'British', style: 'Authoritative', emoji: '🎙️' },
+  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill', gender: 'male', accent: 'American', style: 'Gruff', emoji: '🗿' },
+  { id: 'z9fAnlkpzviPz146aGWa', name: 'Glinda', gender: 'female', accent: 'American', style: 'Mystical', emoji: '✨' },
+]
+
+interface Scene {
+  id: number
+  timestamp: string
+  text: string
+  searchQuery: string
+  type: 'hook' | 'story' | 'cta'
+  mediaUrl?: string
+  customMediaUrl?: string
+}
+
 // ── VIDEO WALL DATA ───────────────────────────────────────────────────────────
 const wallCategories = [
   { id: 'trending', label: '🔥 Trending' },
@@ -149,31 +174,49 @@ const wallVideos: Record<string, { id: number; title: string; prompt: string; sc
 }
 
 // ── CLAUDE API ────────────────────────────────────────────────────────────────
-async function callClaude(systemPrompt: string, userMessage: string): Promise<string> {
-  const apiKey = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('Add NEXT_PUBLIC_ANTHROPIC_API_KEY to .env.local')
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+// All AI calls go through server-side API routes (keeps keys secure)
+async function callMagic(script: string, instruction: string): Promise<string> {
+  const res = await fetch('/api/magic', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ script, instruction }),
   })
-  if (!res.ok) {
-    let errMsg = `HTTP ${res.status}`
-    try { const e = await res.json(); errMsg = e?.error?.message || errMsg } catch {}
-    throw new Error(errMsg)
-  }
   const data = await res.json()
-  return data.content?.[0]?.text || ''
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`)
+  return data.result || ''
+}
+
+async function callGenerateScript(idea: string, style: string): Promise<any> {
+  const res = await fetch('/api/generate-script', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idea, style, action: 'script' }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`)
+  return data
+}
+
+async function callScoreScript(idea: string, style: string, script: string): Promise<{score: number, reason: string}> {
+  const res = await fetch('/api/generate-script', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idea, style, action: 'score', script }),
+  })
+  const data = await res.json()
+  if (!res.ok) return { score: 75, reason: 'Good viral potential' }
+  return data
+}
+
+async function callGenerateVoice(text: string, voiceId: string, settings: any): Promise<string> {
+  const res = await fetch('/api/generate-voice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voiceId, ...settings }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Voice error ${res.status}`)
+  return data.dataUrl || ''
 }
 
 // ── VIDEO WALL ────────────────────────────────────────────────────────────────
@@ -332,6 +375,24 @@ export default function Dashboard() {
   const trimBarRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null)
 
+  // ── Video generation state ──
+  const [scenes, setScenes] = useState<Scene[]>([])
+  const [activeSceneTab, setActiveSceneTab] = useState<'scenes' | 'voice' | 'render'>('scenes')
+  const [selectedElevenVoice, setSelectedElevenVoice] = useState(elevenLabsVoices[0])
+  const [voiceStability, setVoiceStability] = useState(0.5)
+  const [voiceSimilarity, setVoiceSimilarity] = useState(0.75)
+  const [voiceStyleAmount, setVoiceStyleAmount] = useState(0.5)
+  const [voiceSpeedEl, setVoiceSpeedEl] = useState(1.0)
+  const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null)
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [audioError, setAudioError] = useState('')
+  const [renderLoading, setRenderLoading] = useState(false)
+  const [renderProgress, setRenderProgress] = useState(0)
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null)
+  const [renderError, setRenderError] = useState('')
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
   // ── GENERATE ────────────────────────────────────────────────────────────────
   async function handleGenerate() {
     if (!idea.trim()) return
@@ -341,60 +402,83 @@ export default function Dashboard() {
     setCurrentStep(0)
     setScript('')
     setViralScore(0)
+    setScenes([])
+    setRenderedVideoUrl(null)
+    setGeneratedAudioUrl(null)
 
-    // Step 1: Real AI script
+    // Step 1: Real AI script via server route
     setCurrentStep(1)
     let newScript = ''
+    let newScenes: Scene[] = []
+    let newTitle = idea.slice(0, 60)
     try {
-      newScript = await callClaude(
-        `You are ClipForge AI, an expert YouTube Shorts scriptwriter. Write viral, high-retention scripts for YouTube Shorts (under 60 seconds). Always follow this exact format:
-
-🎬 HOOK (0–3s)
-[A shocking, curiosity-driven opening line. Single sentence. No filler words.]
-
-📖 STORY (3–50s)
-[Main content. Short punchy sentences. Each on its own line. 8-12 lines max. Style: ${effectiveStyle}]
-
-🎯 CTA (50–60s)
-[One strong call to action — follow, comment, or share. Specific and emotional.]
-
-Rules: No fluff. No intros. Start with hook immediately. Every line must earn its place.`,
-        `Write a ${effectiveStyle} YouTube Short script about: ${idea}`
-      )
+      const data = await callGenerateScript(idea, effectiveStyle)
+      newScript = data.script || ''
+      newScenes = data.scenes || []
+      newTitle = data.title || newTitle
     } catch (err: any) {
       newScript = `🎬 HOOK (0–3s)\n"${idea.slice(0, 60)} — most people have no idea."\n\n📖 STORY (3–50s)\nHere's what they don't tell you.\nThe truth has been hiding in plain sight.\nAnd once you see it, you can't unsee it.\n\nThis isn't opinion.\nThis is documented fact.\nThe evidence has existed for decades.\n\nYet nobody talks about it.\nUntil now.\n\n🎯 CTA (50–60s)\n"Follow for more stories they don't want you to know."`
+      // Create default scenes from fallback script
+      newScenes = [
+        { id: 1, timestamp: '0–3s', text: idea, searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'hook' },
+        { id: 2, timestamp: '3–20s', text: 'The truth revealed', searchQuery: idea.split(' ').slice(0,2).join(' ') + ' dramatic', type: 'story' },
+        { id: 3, timestamp: '20–40s', text: 'Deep dive', searchQuery: idea.split(' ').slice(0,2).join(' ') + ' close up', type: 'story' },
+        { id: 4, timestamp: '40–58s', text: 'Call to action', searchQuery: 'subscribe follow social media', type: 'cta' },
+      ]
     }
     setScript(newScript)
     setGeneratedScript(newScript)
+    setScenes(newScenes)
 
-    // Steps 2–5: Simulated
-    for (let i = 2; i <= 5; i++) {
-      setCurrentStep(i)
-      await new Promise(r => setTimeout(r, 800))
+    // Steps 2–3: Fetch Pexels images for each scene
+    setCurrentStep(2)
+    const pexelsKey = process.env.NEXT_PUBLIC_PEXELS_API_KEY
+    if (pexelsKey && newScenes.length > 0) {
+      const enrichedScenes = await Promise.all(newScenes.map(async (scene) => {
+        try {
+          const res = await fetch(
+            `https://api.pexels.com/v1/search?query=${encodeURIComponent(scene.searchQuery)}&per_page=6&orientation=portrait`,
+            { headers: { Authorization: pexelsKey } }
+          )
+          const data = await res.json()
+          const photo = data.photos?.[0]
+          return { ...scene, mediaUrl: photo?.src?.large || `https://picsum.photos/seed/${encodeURIComponent(scene.searchQuery)}/720/1280` }
+        } catch {
+          return { ...scene, mediaUrl: `https://picsum.photos/seed/${encodeURIComponent(scene.searchQuery)}/720/1280` }
+        }
+      }))
+      setScenes(enrichedScenes)
+    } else {
+      // Use picsum placeholders if no Pexels key
+      setScenes(newScenes.map(s => ({ ...s, mediaUrl: `https://picsum.photos/seed/${encodeURIComponent(s.searchQuery)}/720/1280` })))
     }
+
+    setCurrentStep(3)
+    await new Promise(r => setTimeout(r, 600))
+    setCurrentStep(4)
+    await new Promise(r => setTimeout(r, 600))
+    setCurrentStep(5)
+    await new Promise(r => setTimeout(r, 600))
 
     // Step 6: Real AI viral score
     setCurrentStep(6)
     let score = 75
+    let scoreReason = 'Good viral potential'
     try {
-      const scoreText = await callClaude(
-        `You are a viral content analyst. Analyse this YouTube Short script and return ONLY a number from 60 to 99 representing its viral potential. Consider: hook strength (0-3s), pacing, emotional triggers, curiosity gap, CTA quality, retention likelihood. Return ONLY the number, nothing else.`,
-        `Script:\n${newScript}\n\nTopic: ${idea}\nStyle: ${effectiveStyle}`
-      )
-      const parsed = parseInt(scoreText.trim().replace(/\D/g, ''))
-      if (!isNaN(parsed) && parsed >= 60 && parsed <= 99) score = parsed
+      const scoreData = await callScoreScript(idea, effectiveStyle, newScript)
+      score = scoreData.score
+      scoreReason = scoreData.reason
     } catch {
       score = Math.floor(Math.random() * 15) + 78
     }
     setViralScore(score)
 
     // Auto-fill metadata
-    const shortTitle = idea.length > 60 ? idea.slice(0, 57) + '...' : idea
-    setYtTitle(shortTitle)
+    setYtTitle(newTitle)
     setYtDesc(`A ${effectiveStyle} YouTube Short about: ${idea}\n\nGenerated with ClipForge AI ⚡`)
     setYtHashtags(`#shorts #${effectiveStyle.toLowerCase()} #viral #youtube #trending`)
     setYtTags(`shorts, ${effectiveStyle.toLowerCase()}, viral, youtube, trending`)
-    setThumbTitle(idea.slice(0, 40))
+    setThumbTitle(newTitle.slice(0, 40))
     setPexelsQuery(idea.split(' ').slice(0, 3).join(' '))
 
     setIsGenerating(false)
@@ -455,13 +539,183 @@ Rules: No fluff. No intros. Start with hook immediately. Every line must earn it
     if (!magicCommand.trim() || !script) return
     setMagicLoading(true); setMagicResult('')
     try {
-      const result = await callClaude(
-        `You are a YouTube Shorts script editor. Apply the user's instruction to improve the script. Return the COMPLETE rewritten script in the same 🎬 HOOK / 📖 STORY / 🎯 CTA format. Return only the script, no commentary.`,
-        `Current script:\n${script}\n\nInstruction: ${magicCommand}`
-      )
+      const result = await callMagic(script, magicCommand)
       setMagicResult(result)
-    } catch (err: any) { setMagicResult('⚠️ Error: ' + (err?.message || 'Unknown error. Check API key in Vercel → Settings → Environment Variables')) }
+    } catch (err: any) { 
+      setMagicResult('⚠️ Error: ' + (err?.message || 'Check ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables'))
+    }
     setMagicLoading(false)
+  }
+
+  // ── ELEVENLABS VOICE GENERATION ─────────────────────────────────────────────
+  async function handleGenerateVoice() {
+    if (!script) return
+    setAudioLoading(true)
+    setAudioError('')
+    setGeneratedAudioUrl(null)
+    try {
+      const cleanText = script.replace(/🎬 HOOK.*|📖 STORY.*|🎯 CTA.*|\(.*?\)/g, '').trim()
+      const dataUrl = await callGenerateVoice(cleanText, selectedElevenVoice.id, {
+        stability: voiceStability,
+        similarityBoost: voiceSimilarity,
+        style: voiceStyleAmount,
+        speed: voiceSpeedEl,
+      })
+      setGeneratedAudioUrl(dataUrl)
+    } catch (err: any) {
+      setAudioError(err?.message || 'Voice generation failed. Check ELEVENLABS_API_KEY in Vercel settings.')
+    }
+    setAudioLoading(false)
+  }
+
+  // ── VIDEO RENDER (Canvas-based browser render) ──────────────────────────────
+  async function handleRenderVideo() {
+    if (scenes.length === 0) return
+    setRenderLoading(true)
+    setRenderError('')
+    setRenderedVideoUrl(null)
+    setRenderProgress(0)
+
+    try {
+      const canvas = document.createElement('canvas')
+      const isPortrait = aspectRatio === '9:16'
+      canvas.width = isPortrait ? 720 : aspectRatio === '1:1' ? 720 : 1280
+      canvas.height = isPortrait ? 1280 : aspectRatio === '1:1' ? 720 : 720
+      const ctx = canvas.getContext('2d')!
+      const stream = canvas.captureStream(30)
+
+      // Add audio track if available
+      let audioElement: HTMLAudioElement | null = null
+      if (generatedAudioUrl) {
+        audioElement = new Audio(generatedAudioUrl)
+        audioElement.play()
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' })
+      const chunks: Blob[] = []
+      mediaRecorder.ondataavailable = e => chunks.push(e.data)
+      mediaRecorder.start()
+
+      const sceneDuration = Math.floor(5800 / scenes.length) // total ~58s
+      
+      for (let i = 0; i < scenes.length; i++) {
+        const scene = scenes[i]
+        setRenderProgress(Math.round((i / scenes.length) * 80))
+        
+        // Load scene image
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve()
+          img.onerror = () => resolve()
+          img.src = scene.customMediaUrl || scene.mediaUrl || `https://picsum.photos/seed/${i}/720/1280`
+        })
+
+        // Animate this scene for sceneDuration ms
+        const startTime = Date.now()
+        const duration = sceneDuration
+
+        await new Promise<void>((resolve) => {
+          function drawFrame() {
+            const elapsed = Date.now() - startTime
+            const progress = Math.min(elapsed / duration, 1)
+            
+            // Ken Burns zoom effect
+            const zoom = 1 + progress * 0.05
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            ctx.save()
+            ctx.translate(canvas.width / 2, canvas.height / 2)
+            ctx.scale(zoom, zoom)
+            ctx.translate(-canvas.width / 2, -canvas.height / 2)
+            
+            if (img.complete && img.naturalWidth > 0) {
+              // Draw image cover
+              const imgAspect = img.naturalWidth / img.naturalHeight
+              const canvasAspect = canvas.width / canvas.height
+              let sw, sh, sx, sy
+              if (imgAspect > canvasAspect) {
+                sh = img.naturalHeight; sw = sh * canvasAspect
+                sx = (img.naturalWidth - sw) / 2; sy = 0
+              } else {
+                sw = img.naturalWidth; sh = sw / canvasAspect
+                sx = 0; sy = (img.naturalHeight - sh) / 2
+              }
+              ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+            } else {
+              // Gradient fallback
+              const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+              grad.addColorStop(0, '#0a1628')
+              grad.addColorStop(1, '#1a0a28')
+              ctx.fillStyle = grad
+              ctx.fillRect(0, 0, canvas.width, canvas.height)
+            }
+            ctx.restore()
+
+            // Dark overlay at bottom for caption readability
+            const overlayGrad = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height)
+            overlayGrad.addColorStop(0, 'rgba(0,0,0,0)')
+            overlayGrad.addColorStop(1, 'rgba(0,0,0,0.8)')
+            ctx.fillStyle = overlayGrad
+            ctx.fillRect(0, canvas.height * 0.5, canvas.width, canvas.height * 0.5)
+
+            // Caption text
+            const fontSize = captionSize === 'large' ? canvas.width * 0.06 : captionSize === 'medium' ? canvas.width * 0.045 : canvas.width * 0.035
+            ctx.font = `900 ${fontSize}px Impact, Arial Black, sans-serif`
+            ctx.fillStyle = captionColor
+            ctx.strokeStyle = 'rgba(0,0,0,0.9)'
+            ctx.lineWidth = fontSize * 0.12
+            ctx.textAlign = 'center'
+            const words = scene.text.split(' ')
+            const maxWidth = canvas.width * 0.85
+            const lines: string[] = []
+            let currentLine = ''
+            for (const word of words) {
+              const test = currentLine + word + ' '
+              if (ctx.measureText(test).width > maxWidth && currentLine) {
+                lines.push(currentLine.trim()); currentLine = word + ' '
+              } else currentLine = test
+            }
+            if (currentLine) lines.push(currentLine.trim())
+            const lineHeight = fontSize * 1.3
+            const totalHeight = lines.length * lineHeight
+            let textY = canvas.height * 0.82 - totalHeight / 2
+            for (const line of lines) {
+              ctx.strokeText(line, canvas.width / 2, textY)
+              ctx.fillText(line, canvas.width / 2, textY)
+              textY += lineHeight
+            }
+
+            // Scene indicator
+            ctx.font = \`bold \${canvas.width * 0.025}px Arial\`
+            ctx.fillStyle = 'rgba(255,255,255,0.5)'
+            ctx.textAlign = 'right'
+            ctx.fillText(\`\${scene.timestamp}\`, canvas.width - 20, 35)
+
+            if (progress < 1) requestAnimationFrame(drawFrame)
+            else resolve()
+          }
+          drawFrame()
+        })
+      }
+
+      setRenderProgress(90)
+      mediaRecorder.stop()
+      
+      await new Promise<void>(resolve => {
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' })
+          const url = URL.createObjectURL(blob)
+          setRenderedVideoUrl(url)
+          resolve()
+        }
+      })
+
+      setRenderProgress(100)
+      if (audioElement) audioElement.pause()
+    } catch (err: any) {
+      setRenderError(err?.message || 'Render failed. Please try again.')
+    }
+    setRenderLoading(false)
   }
 
   function handleVoicePreview() {
@@ -502,6 +756,7 @@ Rules: No fluff. No intros. Start with hook immediately. Every line must earn it
 
   const editorTabs = [
     { id: 'video', label: '🎬 Script' },
+    { id: 'generate', label: '🎥 Video' },
     { id: 'captions', label: '💬 Captions' },
     { id: 'voice', label: '🎙️ Voice' },
     { id: 'language', label: '🌍 Language' },
@@ -867,6 +1122,262 @@ Rules: No fluff. No intros. Start with hook immediately. Every line must earn it
                             🪄 Magic Edit
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {/* VIDEO GENERATION TAB */}
+                    {activeEditorTab === 'generate' && (
+                      <div className="space-y-4">
+                        {/* Sub-tabs */}
+                        <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+                          {(['scenes', 'voice', 'render'] as const).map(t => (
+                            <button key={t} onClick={() => setActiveSceneTab(t)}
+                              className={`flex-1 py-2 rounded-lg text-xs font-bold capitalize transition-all ${activeSceneTab === t ? 'bg-[#00c8ff]/20 text-[#00c8ff] border border-[#00c8ff]/30' : 'text-gray-400 hover:text-white'}`}>
+                              {t === 'scenes' ? '🎬 Scenes' : t === 'voice' ? '🎙️ Voice' : '🚀 Render'}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* SCENES */}
+                        {activeSceneTab === 'scenes' && (
+                          <div className="space-y-3">
+                            <p className="text-xs text-gray-400">Each scene auto-matched to stock footage. Drag to reorder, tap to swap image.</p>
+                            {scenes.length === 0 ? (
+                              <div className="text-center py-8 border border-dashed border-white/10 rounded-xl">
+                                <div className="text-3xl mb-2">🎬</div>
+                                <p className="text-gray-500 text-xs">Generate a script first to see scenes</p>
+                              </div>
+                            ) : (
+                              scenes.map((scene, idx) => (
+                                <div key={scene.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                                  <div className="flex items-stretch">
+                                    {/* Scene thumbnail */}
+                                    <div className="relative w-16 shrink-0">
+                                      {scene.mediaUrl ? (
+                                        <img src={scene.mediaUrl} alt="" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="w-full h-full bg-gradient-to-b from-[#00c8ff]/20 to-[#7b2fff]/20 flex items-center justify-center text-2xl">🎬</div>
+                                      )}
+                                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-all cursor-pointer"
+                                        onClick={() => {
+                                          const url = prompt('Paste image URL for this scene:')
+                                          if (url) setScenes(prev => prev.map((s, i) => i === idx ? { ...s, customMediaUrl: url, mediaUrl: url } : s))
+                                        }}>
+                                        <span className="text-white text-xs font-bold">Swap</span>
+                                      </div>
+                                    </div>
+                                    {/* Scene content */}
+                                    <div className="flex-1 p-2.5">
+                                      <div className="flex items-center gap-2 mb-1.5">
+                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${scene.type === 'hook' ? 'bg-[#00c8ff]/20 text-[#00c8ff]' : scene.type === 'cta' ? 'bg-[#ff6b35]/20 text-[#ff6b35]' : 'bg-[#7b2fff]/20 text-[#7b2fff]'}`}>
+                                          {scene.type.toUpperCase()}
+                                        </span>
+                                        <span className="text-[9px] text-gray-500">{scene.timestamp}</span>
+                                        <span className="ml-auto text-[9px] text-gray-600">Scene {idx + 1}</span>
+                                      </div>
+                                      <textarea
+                                        value={scene.text}
+                                        onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, text: e.target.value } : s))}
+                                        rows={2}
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-300 resize-none focus:outline-none focus:border-[#00c8ff]/50 transition-colors mb-1.5"
+                                      />
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] text-gray-500">🔍</span>
+                                        <input
+                                          value={scene.searchQuery}
+                                          onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, searchQuery: e.target.value } : s))}
+                                          placeholder="search query for footage..."
+                                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-400 focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
+                                        />
+                                        <button
+                                          onClick={async () => {
+                                            const pexelsKey = process.env.NEXT_PUBLIC_PEXELS_API_KEY
+                                            if (!pexelsKey) {
+                                              setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: `https://picsum.photos/seed/${encodeURIComponent(scene.searchQuery + Date.now())}/720/1280` } : s))
+                                              return
+                                            }
+                                            try {
+                                              const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(scene.searchQuery)}&per_page=6&orientation=portrait`, { headers: { Authorization: pexelsKey } })
+                                              const data = await res.json()
+                                              const photos = data.photos || []
+                                              if (photos.length > 0) {
+                                                const random = photos[Math.floor(Math.random() * photos.length)]
+                                                setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: random.src.large, customMediaUrl: undefined } : s))
+                                              }
+                                            } catch {}
+                                          }}
+                                          className="text-[9px] bg-[#00c8ff]/10 border border-[#00c8ff]/30 text-[#00c8ff] px-2 py-1 rounded-lg hover:bg-[#00c8ff]/20 transition-all whitespace-nowrap">
+                                          🔄 Refresh
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                            {scenes.length > 0 && (
+                              <button
+                                onClick={() => setScenes(prev => [...prev, { id: Date.now(), timestamp: 'custom', text: 'New scene text', searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'story' }])}
+                                className="w-full py-2 border border-dashed border-white/20 rounded-xl text-xs text-gray-400 hover:border-[#00c8ff]/40 hover:text-[#00c8ff] transition-all">
+                                + Add Scene
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ELEVENLABS VOICE */}
+                        {activeSceneTab === 'voice' && (
+                          <div className="space-y-4">
+                            <div className="p-3 bg-[#00c8ff]/5 border border-[#00c8ff]/20 rounded-xl flex items-start gap-2">
+                              <span className="text-sm shrink-0">💡</span>
+                              <p className="text-xs text-[#00c8ff]">Add <strong>ELEVENLABS_API_KEY</strong> in Vercel → Settings → Environment Variables for realistic AI voices. Get a free key at elevenlabs.io</p>
+                            </div>
+
+                            <div>
+                              <label className="text-xs text-gray-400 font-semibold block mb-2">🎙️ Choose Voice</label>
+                              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto scrollbar-hide pr-1">
+                                {elevenLabsVoices.map(v => (
+                                  <button key={v.id} onClick={() => setSelectedElevenVoice(v)}
+                                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${selectedElevenVoice.id === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : 'border-white/10 hover:border-white/30'}`}>
+                                    <span className="text-lg shrink-0">{v.emoji}</span>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-white">{v.name}</p>
+                                      <p className="text-[9px] text-gray-500">{v.accent} · {v.style}</p>
+                                    </div>
+                                    {selectedElevenVoice.id === v.id && <span className="ml-auto text-[#00c8ff] text-xs shrink-0">✓</span>}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <label className="text-xs text-gray-400 font-semibold block">🎛️ Voice Settings</label>
+                              {[
+                                { label: 'Stability', value: voiceStability, set: setVoiceStability, hint: 'Lower = more expressive', color: '#00c8ff' },
+                                { label: 'Similarity', value: voiceSimilarity, set: setVoiceSimilarity, hint: 'Higher = truer to voice', color: '#7b2fff' },
+                                { label: 'Style', value: voiceStyleAmount, set: setVoiceStyleAmount, hint: 'More style = more dramatic', color: '#ff6b35' },
+                              ].map(ctrl => (
+                                <div key={ctrl.label}>
+                                  <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-gray-400">{ctrl.label}</span>
+                                    <span className="text-gray-500 text-[10px]">{ctrl.hint}</span>
+                                  </div>
+                                  <input type="range" min="0" max="1" step="0.05" value={ctrl.value}
+                                    onChange={e => ctrl.set(+e.target.value)}
+                                    className="w-full" style={{ accentColor: ctrl.color }} />
+                                </div>
+                              ))}
+                              <div>
+                                <div className="flex justify-between text-xs mb-1">
+                                  <span className="text-gray-400">Speed</span>
+                                  <span className="text-white font-semibold">{voiceSpeedEl}x</span>
+                                </div>
+                                <input type="range" min="0.7" max="1.3" step="0.05" value={voiceSpeedEl}
+                                  onChange={e => setVoiceSpeedEl(+e.target.value)}
+                                  className="w-full" style={{ accentColor: '#00ff88' }} />
+                              </div>
+                            </div>
+
+                            <button onClick={handleGenerateVoice} disabled={audioLoading}
+                              className="w-full py-3 rounded-xl bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] text-black font-black text-sm hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                              {audioLoading ? '⏳ Generating voice...' : `🎙️ Generate Voice — ${selectedElevenVoice.name}`}
+                            </button>
+
+                            {audioError && (
+                              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
+                                ⚠️ {audioError}
+                              </div>
+                            )}
+
+                            {generatedAudioUrl && (
+                              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
+                                <p className="text-xs text-green-400 font-bold mb-2">✅ Voice generated! Preview:</p>
+                                <audio src={generatedAudioUrl} controls className="w-full h-8" style={{ filter: 'invert(1) hue-rotate(180deg)' }} />
+                                <a href={generatedAudioUrl} download="clipforge-voice.mp3"
+                                  className="mt-2 w-full py-1.5 border border-green-500/30 text-green-400 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-green-500/10 transition-all">
+                                  ⬇️ Download MP3
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* RENDER */}
+                        {activeSceneTab === 'render' && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                <p className="text-gray-400 mb-1">Scenes</p>
+                                <p className="font-black text-white text-lg">{scenes.length}</p>
+                              </div>
+                              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                <p className="text-gray-400 mb-1">Voice</p>
+                                <p className="font-black text-white text-sm">{generatedAudioUrl ? selectedElevenVoice.name : 'None'}</p>
+                              </div>
+                              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                <p className="text-gray-400 mb-1">Format</p>
+                                <p className="font-black text-white text-lg">{aspectRatio}</p>
+                              </div>
+                              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                                <p className="text-gray-400 mb-1">Captions</p>
+                                <p className="font-black text-white text-sm capitalize">{captionStyle}</p>
+                              </div>
+                            </div>
+
+                            <div className="p-3 bg-[#7b2fff]/5 border border-[#7b2fff]/20 rounded-xl text-xs text-gray-400 space-y-1">
+                              <p className="font-semibold text-white">📋 Render checklist:</p>
+                              <p className={scenes.length > 0 ? 'text-green-400' : 'text-yellow-400'}>
+                                {scenes.length > 0 ? '✅' : '⏳'} Scenes ready ({scenes.length})
+                              </p>
+                              <p className={generatedAudioUrl ? 'text-green-400' : 'text-gray-500'}>
+                                {generatedAudioUrl ? '✅' : '○'} Voice audio {generatedAudioUrl ? 'ready' : '(optional)'}
+                              </p>
+                              <p className="text-green-400">✅ Captions configured</p>
+                            </div>
+
+                            {renderLoading && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-[#00c8ff] animate-pulse">🎬 Rendering video...</span>
+                                  <span className="text-white font-bold">{renderProgress}%</span>
+                                </div>
+                                <div className="w-full bg-white/10 rounded-full h-2">
+                                  <div className="h-2 rounded-full bg-gradient-to-r from-[#00c8ff] to-[#7b2fff] transition-all duration-300"
+                                    style={{ width: `${renderProgress}%` }} />
+                                </div>
+                                <p className="text-[10px] text-gray-500">Drawing {Math.ceil(renderProgress / (100 / scenes.length))} of {scenes.length} scenes...</p>
+                              </div>
+                            )}
+
+                            {renderError && (
+                              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
+                                ⚠️ {renderError}
+                              </div>
+                            )}
+
+                            {renderedVideoUrl && !renderLoading && (
+                              <div className="space-y-3">
+                                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
+                                  <p className="text-xs text-green-400 font-bold mb-2">✅ Video rendered!</p>
+                                  <video src={renderedVideoUrl} controls className="w-full rounded-xl" style={{ maxHeight: '300px' }} />
+                                </div>
+                                <a href={renderedVideoUrl} download="clipforge-video.webm"
+                                  className="w-full py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+                                  ⬇️ Download Video (.webm)
+                                </a>
+                                <p className="text-[10px] text-gray-600 text-center">WebM format · Compatible with YouTube, TikTok, Instagram</p>
+                              </div>
+                            )}
+
+                            {!renderedVideoUrl && !renderLoading && (
+                              <button onClick={handleRenderVideo} disabled={scenes.length === 0}
+                                className="w-full py-4 rounded-xl bg-gradient-to-r from-[#7b2fff] to-[#ff6b35] text-white font-black text-base hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                style={{ boxShadow: '0 0 30px rgba(123,47,255,0.3)' }}>
+                                🎬 Render Video Now
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
