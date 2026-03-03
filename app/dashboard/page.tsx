@@ -660,7 +660,7 @@ export default function Dashboard() {
 
             // Caption text
             const fontSize = captionSize === 'large' ? canvas.width * 0.06 : captionSize === 'medium' ? canvas.width * 0.045 : canvas.width * 0.035
-            ctx.font = `900 ${fontSize}px Impact, Arial Black, sans-serif`
+            ctx.font = '900 ' + fontSize + 'px Impact, Arial Black, sans-serif'
             ctx.fillStyle = captionColor
             ctx.strokeStyle = 'rgba(0,0,0,0.9)'
             ctx.lineWidth = fontSize * 0.12
@@ -686,10 +686,10 @@ export default function Dashboard() {
             }
 
             // Scene indicator
-            ctx.font = `bold ${canvas.width * 0.025}px Arial`
+            ctx.font = 'bold ' + (canvas.width * 0.025) + 'px Arial'
             ctx.fillStyle = 'rgba(255,255,255,0.5)'
             ctx.textAlign = 'right'
-            ctx.fillText(`${scene.timestamp}`, canvas.width - 20, 35)
+            ctx.fillText(scene.timestamp, canvas.width - 20, 35)
 
             if (progress < 1) requestAnimationFrame(drawFrame)
             else resolve()
@@ -1606,7 +1606,7 @@ export default function Dashboard() {
                             const ctx = canvas.getContext('2d')
                             if (ctx) {
                               ctx.fillStyle = '#050d1a'; ctx.fillRect(0, 0, 1280, 720)
-                              ctx.fillStyle = '#ffffff'; ctx.font = `bold 72px ${brandFont}`; ctx.textAlign = 'center'
+                              ctx.fillStyle = '#ffffff'; ctx.font = 'bold 72px ' + brandFont; ctx.textAlign = 'center'
                               const words = (thumbTitle || idea).split(' ')
                               let line = '', y = 360
                               for (const word of words) {
