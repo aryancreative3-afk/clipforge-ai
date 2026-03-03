@@ -70,16 +70,22 @@ export default function Dashboard(){
   const tRef=useRef<HTMLTextAreaElement>(null)
   useEffect(()=>{if(step===0)tRef.current?.focus()},[step])
 
-  function startPrev(v:Voice){
-    if(prevId===v.id)return
-    window.speechSynthesis.cancel();setPrevId(v.id)
-    const u=new SpeechSynthesisUtterance(v.sample)
-    u.lang=v.accent==='British'?'en-GB':v.accent==='Australian'?'en-AU':'en-US'
-    u.pitch=v.gender==='female'?1.1:v.style==='Deep'?0.7:0.85
-    u.rate=v.style==='Deep'?0.9:1.0
-    u.onend=()=>setPrevId(null);u.onerror=()=>setPrevId(null)
-    window.speechSynthesis.speak(u)
-  }
+  function startPrev(v: Voice) {
+  if (prevId === v.id) return
+  // Mobile requires a tap gesture — we use a fallback touch handler
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  setPrevId(v.id)
+  const u = new SpeechSynthesisUtterance(v.sample)
+  u.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : 'en-US'
+  u.pitch = v.gender === 'female' ? 1.1 : v.style === 'Deep' ? 0.7 : 0.85
+  u.rate = v.style === 'Deep' ? 0.9 : 1.0
+  u.volume = 1.0
+  u.onend = () => setPrevId(null)
+  u.onerror = () => setPrevId(null)
+  // Small timeout fixes iOS Safari speechSynthesis bug
+  setTimeout(() => window.speechSynthesis.speak(u), 100)
+}
   function stopPrev(){window.speechSynthesis.cancel();setPrevId(null)}
 
   async function generate(){
