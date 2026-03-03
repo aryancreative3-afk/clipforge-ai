@@ -405,6 +405,7 @@ export default function Dashboard() {
   const [renderError, setRenderError] = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null)
+  const [hoveredVideoKey, setHoveredVideoKey] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [renderId, setRenderId] = useState<string | null>(null)
   const [renderBucket, setRenderBucket] = useState<string | null>(null)
@@ -1157,69 +1158,107 @@ export default function Dashboard() {
                                       className="text-gray-600 hover:text-red-400 text-xs transition-colors">✕</button>
                                   </div>
 
-                                  {/* Video picker row */}
-                                  <div className="px-3 pb-2">
-                                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-                                      {/* Current selected */}
-                                      <div className="relative shrink-0 w-14 h-20 rounded-lg overflow-hidden border-2 border-[#00c8ff]">
-                                        {scene.mediaUrl ? (
-                                          <video
-                                            src={scene.mediaUrl}
-                                            className="w-full h-full object-cover"
-                                            muted
-                                            loop
-                                            autoPlay
-                                            playsInline
-                                            onError={e => { (e.target as HTMLVideoElement).style.display = 'none' }}
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full bg-gradient-to-b from-[#00c8ff]/20 to-[#7b2fff]/20 flex items-center justify-center text-xl">🎬</div>
-                                        )}
-                                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[8px] text-[#00c8ff] text-center py-0.5 font-bold">ACTIVE</div>
-                                      </div>
+                                  {/* Beautiful stacked video picker */}
+                                  <div className="px-3 pb-3 space-y-3">
 
-                                      {/* Pexels video results */}
-                                      {(scene.pexelsResults || []).map((v, vi) => (
-                                        <div
-                                          key={v.id}
-                                          onClick={() => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: v.bestUrl || v.thumbnail, mediaType: v.type, customMediaUrl: undefined } : s))}
-                                          className="relative shrink-0 w-14 h-20 rounded-lg overflow-hidden border border-white/20 cursor-pointer hover:border-[#00c8ff]/60 transition-all group">
-                                          <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
-                                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
-                                            <span className="text-white text-lg opacity-0 group-hover:opacity-100 transition-all">▶</span>
+                                    {/* Stack grid — 3 per row, portrait cards */}
+                                    <div className="grid grid-cols-3 gap-2">
+                                      {(scene.pexelsResults && scene.pexelsResults.length > 0
+                                        ? scene.pexelsResults
+                                        : scene.mediaUrl ? [{ id: 0, thumbnail: scene.mediaUrl, bestUrl: scene.mediaUrl, duration: scene.durationSeconds, photographer: '', type: scene.mediaType }] : []
+                                      ).map((v, vi) => {
+                                        const key = idx + '-' + vi
+                                        const isActive = (scene.customMediaUrl || scene.mediaUrl) === (v.bestUrl || v.thumbnail)
+                                        const isHovered = hoveredVideoKey === key
+                                        return (
+                                          <div
+                                            key={v.id + '-' + vi}
+                                            onClick={() => setScenes(prev => prev.map((s, i) => i === idx ? {
+                                              ...s,
+                                              mediaUrl: v.bestUrl || v.thumbnail,
+                                              mediaType: v.type as 'video' | 'image',
+                                              customMediaUrl: undefined,
+                                            } : s))}
+                                            onMouseEnter={() => setHoveredVideoKey(key)}
+                                            onMouseLeave={() => setHoveredVideoKey(null)}
+                                            className="relative cursor-pointer rounded-xl overflow-hidden transition-all duration-300"
+                                            style={{
+                                              aspectRatio: '9/16',
+                                              border: isActive ? '2.5px solid #00c8ff' : '2px solid rgba(255,255,255,0.08)',
+                                              transform: isHovered ? 'scale(1.04) translateY(-3px)' : 'scale(1)',
+                                              boxShadow: isActive
+                                                ? '0 0 20px rgba(0,200,255,0.4)'
+                                                : isHovered
+                                                ? '0 8px 30px rgba(0,0,0,0.5)'
+                                                : '0 2px 8px rgba(0,0,0,0.3)',
+                                            }}>
+
+                                            {/* Thumbnail */}
+                                            <img
+                                              src={v.thumbnail}
+                                              alt=""
+                                              className="w-full h-full object-cover"
+                                            />
+
+                                            {/* Hover video preview */}
+                                            {isHovered && v.bestUrl && (
+                                              <video
+                                                src={v.bestUrl}
+                                                className="absolute inset-0 w-full h-full object-cover"
+                                                autoPlay
+                                                muted
+                                                loop
+                                                playsInline
+                                              />
+                                            )}
+
+                                            {/* Gradient overlay */}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+
+                                            {/* Active badge */}
+                                            {isActive && (
+                                              <div className="absolute top-1.5 left-1.5 bg-[#00c8ff] text-black text-[8px] font-black px-1.5 py-0.5 rounded-full">
+                                                ✓ ACTIVE
+                                              </div>
+                                            )}
+
+                                            {/* Hover play icon */}
+                                            {isHovered && !isActive && (
+                                              <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/40">
+                                                  <span className="text-white text-sm ml-0.5">▶</span>
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Duration badge */}
+                                            <div className="absolute bottom-1.5 right-1.5 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded-full">
+                                              {v.duration}s
+                                            </div>
+
+                                            {/* Photographer */}
+                                            {v.photographer && (
+                                              <div className="absolute bottom-1.5 left-1.5 text-[7px] text-white/50 truncate max-w-[60%]">
+                                                {v.photographer}
+                                              </div>
+                                            )}
                                           </div>
-                                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[7px] text-gray-300 text-center py-0.5">{v.duration}s</div>
-                                        </div>
-                                      ))}
+                                        )
+                                      })}
 
-                                      {/* Upload custom */}
-                                      <label className="shrink-0 w-14 h-20 rounded-lg border border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-[#00c8ff]/40 transition-all gap-1">
-                                        <span className="text-lg">📁</span>
-                                        <span className="text-[7px] text-gray-500 text-center px-1">Upload</span>
-                                        <input type="file" accept="video/*,image/*" className="hidden"
-                                          onChange={e => {
-                                            const file = e.target.files?.[0]
-                                            if (!file) return
-                                            const url = URL.createObjectURL(file)
-                                            const type = file.type.startsWith('video') ? 'video' : 'image'
-                                            setScenes(prev => prev.map((s, i) => i === idx ? { ...s, mediaUrl: url, mediaType: type, customMediaUrl: url } : s))
-                                          }}
-                                        />
-                                      </label>
-
-                                      {/* Refresh from Pexels */}
+                                      {/* Load more button */}
                                       <button
                                         onClick={async () => {
                                           setScenes(prev => prev.map((s, i) => i === idx ? { ...s, loadingMedia: true } : s))
                                           try {
-                                            const res = await fetch('/api/pexels-video?query=' + encodeURIComponent(scene.searchQuery) + '&per_page=6')
+                                            const res = await fetch('/api/pexels-video?query=' + encodeURIComponent(scene.searchQuery) + '&per_page=9')
                                             const data = await res.json()
                                             const videos = data.videos || []
                                             const best = videos[0]
                                             setScenes(prev => prev.map((s, i) => i === idx ? {
                                               ...s,
                                               mediaUrl: best?.bestUrl || best?.thumbnail || s.mediaUrl,
-                                              mediaType: best?.type || 'video',
+                                              mediaType: (best?.type || 'video') as 'video' | 'image',
                                               pexelsResults: videos,
                                               loadingMedia: false,
                                             } : s))
@@ -1227,35 +1266,54 @@ export default function Dashboard() {
                                             setScenes(prev => prev.map((s, i) => i === idx ? { ...s, loadingMedia: false } : s))
                                           }
                                         }}
-                                        className="shrink-0 w-14 h-20 rounded-lg border border-dashed border-[#00c8ff]/30 flex flex-col items-center justify-center hover:border-[#00c8ff]/60 transition-all gap-1">
+                                        className="rounded-xl border-2 border-dashed border-[#00c8ff]/30 flex flex-col items-center justify-center gap-1 hover:border-[#00c8ff]/70 hover:bg-[#00c8ff]/5 transition-all"
+                                        style={{ aspectRatio: '9/16' }}>
                                         {scene.loadingMedia ? (
-                                          <span className="text-[#00c8ff] animate-spin text-lg">⟳</span>
+                                          <span className="text-[#00c8ff] text-xl animate-spin">⟳</span>
                                         ) : (
                                           <>
-                                            <span className="text-lg">🔄</span>
-                                            <span className="text-[7px] text-[#00c8ff] text-center px-1">More</span>
+                                            <span className="text-xl">🔄</span>
+                                            <span className="text-[9px] text-[#00c8ff] font-semibold">More</span>
                                           </>
                                         )}
                                       </button>
                                     </div>
 
-                                    {/* Search query */}
-                                    <div className="flex items-center gap-1.5 mt-2">
+                                    {/* Search + caption row */}
+                                    <div className="flex gap-2">
                                       <input
                                         value={scene.searchQuery}
                                         onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, searchQuery: e.target.value } : s))}
-                                        placeholder="search footage..."
-                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-gray-400 focus:outline-none focus:border-[#00c8ff]/50"
+                                        onKeyDown={async e => {
+                                          if (e.key !== 'Enter') return
+                                          setScenes(prev => prev.map((s, i) => i === idx ? { ...s, loadingMedia: true } : s))
+                                          try {
+                                            const res = await fetch('/api/pexels-video?query=' + encodeURIComponent(scene.searchQuery) + '&per_page=9')
+                                            const data = await res.json()
+                                            const videos = data.videos || []
+                                            setScenes(prev => prev.map((s, i) => i === idx ? {
+                                              ...s,
+                                              mediaUrl: videos[0]?.bestUrl || videos[0]?.thumbnail || s.mediaUrl,
+                                              mediaType: (videos[0]?.type || 'video') as 'video' | 'image',
+                                              pexelsResults: videos,
+                                              loadingMedia: false,
+                                            } : s))
+                                          } catch {
+                                            setScenes(prev => prev.map((s, i) => i === idx ? { ...s, loadingMedia: false } : s))
+                                          }
+                                        }}
+                                        placeholder="Search footage... (press Enter)"
+                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
                                       />
                                     </div>
 
-                                    {/* Scene text */}
+                                    {/* Caption text */}
                                     <textarea
                                       value={scene.text}
                                       onChange={e => setScenes(prev => prev.map((s, i) => i === idx ? { ...s, text: e.target.value } : s))}
                                       rows={2}
-                                      placeholder="Caption text for this scene..."
-                                      className="w-full mt-2 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-300 resize-none focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
+                                      placeholder="Caption text shown on this scene..."
+                                      className="w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-300 resize-none focus:outline-none focus:border-[#00c8ff]/50 transition-colors"
                                     />
                                   </div>
                                 </div>
