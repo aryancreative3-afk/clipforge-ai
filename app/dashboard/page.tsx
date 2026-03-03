@@ -686,10 +686,10 @@ export default function Dashboard() {
             }
 
             // Scene indicator
-            ctx.font = \`bold \${canvas.width * 0.025}px Arial\`
+            ctx.font = `bold ${canvas.width * 0.025}px Arial`
             ctx.fillStyle = 'rgba(255,255,255,0.5)'
             ctx.textAlign = 'right'
-            ctx.fillText(\`\${scene.timestamp}\`, canvas.width - 20, 35)
+            ctx.fillText(`${scene.timestamp}`, canvas.width - 20, 35)
 
             if (progress < 1) requestAnimationFrame(drawFrame)
             else resolve()
