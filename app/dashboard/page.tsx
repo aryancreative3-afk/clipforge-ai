@@ -70,21 +70,23 @@ export default function Dashboard(){
   const tRef=useRef<HTMLTextAreaElement>(null)
   useEffect(()=>{if(step===0)tRef.current?.focus()},[step])
 
-  function startPrev(v: Voice) {
-  if (prevId === v.id) return
-  // Mobile requires a tap gesture — we use a fallback touch handler
-  if (typeof window === 'undefined' || !window.speechSynthesis) return
+function startPrev(v:Voice){
+  if(prevId===v.id)return
+  if(typeof window==='undefined'||!window.speechSynthesis)return
   window.speechSynthesis.cancel()
   setPrevId(v.id)
-  const u = new SpeechSynthesisUtterance(v.sample)
-  u.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : 'en-US'
-  u.pitch = v.gender === 'female' ? 1.1 : v.style === 'Deep' ? 0.7 : 0.85
-  u.rate = v.style === 'Deep' ? 0.9 : 1.0
-  u.volume = 1.0
-  u.onend = () => setPrevId(null)
-  u.onerror = () => setPrevId(null)
-  // Small timeout fixes iOS Safari speechSynthesis bug
-  setTimeout(() => window.speechSynthesis.speak(u), 100)
+  const u=new SpeechSynthesisUtterance(v.sample)
+  u.lang=v.accent==='British'?'en-GB':v.accent==='Australian'?'en-AU':'en-US'
+  u.pitch=v.gender==='female'?1.1:v.style==='Deep'?0.7:0.85
+  u.rate=v.style==='Deep'?0.9:1.0
+  u.volume=1.0
+  u.onend=()=>setPrevId(null)
+  u.onerror=()=>setPrevId(null)
+  window.speechSynthesis.cancel()
+  setTimeout(()=>{
+    if(window.speechSynthesis.paused)window.speechSynthesis.resume()
+    window.speechSynthesis.speak(u)
+  },50)
 }
   function stopPrev(){window.speechSynthesis.cancel();setPrevId(null)}
 
@@ -250,7 +252,7 @@ export default function Dashboard(){
                 {VOICES.map(v=>{
                   const sel=voice.id===v.id,prev=prevId===v.id
                   return(
-                    <div key={v.id} onClick={()=>{setVoice(v);stopPrev()}} onMouseEnter={()=>startPrev(v)} onMouseLeave={stopPrev}
+                    <div key={v.id} onClick={()=>{setVoice(v);stopPrev()}}  onMouseEnter={()=>startPrev(v)} onTouchStart={()=>startPrev(v)} onMouseLeave={stopPrev}
                       className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-150 border select-none"
                       style={{borderColor:sel?v.color:prev?v.color+'55':'rgba(255,255,255,0.07)',background:sel?v.color+'13':prev?v.color+'08':'rgba(255,255,255,0.02)',transform:prev?'translateY(-1px)':'none',boxShadow:sel?'0 0 20px '+v.color+'28':'none'}}>
                       <div className="relative shrink-0">
@@ -275,7 +277,11 @@ export default function Dashboard(){
                   )
                 })}
               </div>
-              <p className="text-[10px] text-white/18 mt-2 text-center">Hover = browser preview · Generate = real ElevenLabs AI</p>
+              <p className="text-[10px] text-white/18 mt-2 text-center">
+  {'ontouchstart' in window
+    ? 'Tap to preview · Tap again to stop'
+    : 'Hover to preview · Generate = real ElevenLabs AI'}
+</p>
             </div>
             <div className="flex gap-3">
               <button onClick={()=>setStep(0)} className="px-5 py-3 rounded-xl text-sm text-white/32 border border-white/[0.07] hover:text-white/52 transition-all">← Back</button>
