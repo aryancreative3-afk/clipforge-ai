@@ -257,7 +257,7 @@ function startPrev(v: Voice) {
                 {VOICES.map(v=>{
                   const sel=voice.id===v.id,prev=prevId===v.id
                   return(
-                    <div key={v.id} onTouchStart={(e)=>{e.preventDefault();if(prevId===v.id){stopPrev()}else{startPrev(v)}}}
+                    <div key={v.id} onClick={()=>setVoice(v)} onTouchStart={(e)=>{e.preventDefault();if(prevId===v.id){stopPrev()}else{startPrev(v)}}}
                       className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-150 border select-none"
                       style={{borderColor:sel?v.color:prev?v.color+'55':'rgba(255,255,255,0.07)',background:sel?v.color+'13':prev?v.color+'08':'rgba(255,255,255,0.02)',transform:prev?'translateY(-1px)':'none',boxShadow:sel?'0 0 20px '+v.color+'28':'none'}}>
                       <div className="relative shrink-0">
