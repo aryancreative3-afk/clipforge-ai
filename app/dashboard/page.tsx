@@ -445,10 +445,10 @@ export default function Dashboard() {
       newScript = `🎬 HOOK (0–3s)\n"${idea.slice(0, 60)} — most people have no idea."\n\n📖 STORY (3–50s)\nHere's what they don't tell you.\nThe truth has been hiding in plain sight.\nAnd once you see it, you can't unsee it.\n\nThis isn't opinion.\nThis is documented fact.\nThe evidence has existed for decades.\n\nYet nobody talks about it.\nUntil now.\n\n🎯 CTA (50–60s)\n"Follow for more stories they don't want you to know."`
       // Create default scenes from fallback script
       newScenes = [
-        { id: 1, timestamp: '0–3s', text: idea, searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'hook' },
-        { id: 2, timestamp: '3–20s', text: 'The truth revealed', searchQuery: idea.split(' ').slice(0,2).join(' ') + ' dramatic', type: 'story' },
-        { id: 3, timestamp: '20–40s', text: 'Deep dive', searchQuery: idea.split(' ').slice(0,2).join(' ') + ' close up', type: 'story' },
-        { id: 4, timestamp: '40–58s', text: 'Call to action', searchQuery: 'subscribe follow social media', type: 'cta' },
+        { id: 1, timestamp: '0–3s', text: idea, searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'hook' as const, mediaType: 'video' as const, durationSeconds: 3 },
+        { id: 2, timestamp: '3–20s', text: 'The truth revealed', searchQuery: idea.split(' ').slice(0,2).join(' ') + ' dramatic', type: 'story' as const, mediaType: 'video' as const, durationSeconds: 17 },
+        { id: 3, timestamp: '20–40s', text: 'Deep dive', searchQuery: idea.split(' ').slice(0,2).join(' ') + ' close up', type: 'story' as const, mediaType: 'video' as const, durationSeconds: 20 },
+        { id: 4, timestamp: '40–58s', text: 'Call to action', searchQuery: 'subscribe follow social media', type: 'cta' as const, mediaType: 'video' as const, durationSeconds: 18 },
       ]
     }
     setScript(newScript)
@@ -1263,7 +1263,7 @@ export default function Dashboard() {
                             )}
                             {scenes.length > 0 && (
                               <button
-                                onClick={() => setScenes(prev => [...prev, { id: Date.now(), timestamp: 'custom', text: 'New scene', searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'story', mediaType: 'video', durationSeconds: 10 }])}
+                                onClick={() => setScenes(prev => [...prev, { id: Date.now(), timestamp: 'custom', text: 'New scene', searchQuery: idea.split(' ').slice(0,2).join(' '), type: 'story' as const, mediaType: 'video' as const, durationSeconds: 10 }])}
                                 className="w-full py-2 border border-dashed border-white/20 rounded-xl text-xs text-gray-400 hover:border-[#00c8ff]/40 hover:text-[#00c8ff] transition-all">
                                 + Add Scene
                               </button>
