@@ -70,18 +70,18 @@ const aspectRatios = [
 ]
 
 const elevenLabsVoices = [
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', gender: 'female', accent: 'American', style: 'Conversational', emoji: '👩' },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: 'male', accent: 'American', style: 'Conversational', emoji: '👨' },
-  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female', accent: 'British', style: 'Elegant', emoji: '👩‍🦱' },
-  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: 'male', accent: 'American', style: 'Deep', emoji: '🧔' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', gender: 'female', accent: 'British', style: 'Warm', emoji: '👩‍🦰' },
-  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will', gender: 'male', accent: 'American', style: 'Friendly', emoji: '😊' },
-  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'female', accent: 'American', style: 'Expressive', emoji: '🎭' },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'male', accent: 'Australian', style: 'Casual', emoji: '🤙' },
-  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'female', accent: 'American', style: 'Warm', emoji: '🌸' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: 'male', accent: 'British', style: 'Authoritative', emoji: '🎙️' },
-  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill', gender: 'male', accent: 'American', style: 'Gruff', emoji: '🗿' },
-  { id: 'z9fAnlkpzviPz146aGWa', name: 'Glinda', gender: 'female', accent: 'American', style: 'Mystical', emoji: '✨' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', gender: 'female', accent: 'American', style: 'Conversational', emoji: '👩', color: '#00c8ff', sample: 'Hi, I am Sarah. Warm, natural and conversational. Perfect for storytelling shorts.' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', gender: 'male', accent: 'American', style: 'Conversational', emoji: '👨', color: '#7b2fff', sample: 'Hey, I am Liam. Friendly and engaging. Great for educational and trending content.' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female', accent: 'British', style: 'Elegant', emoji: '👩‍🦱', color: '#ff6b35', sample: 'Hello, I am Charlotte. Elegant British accent, sophisticated and refined.' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', gender: 'male', accent: 'American', style: 'Deep', emoji: '🧔', color: '#00ff88', sample: 'I am Brian. Deep powerful voice. Built for dramatic and cinematic shorts.' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', gender: 'female', accent: 'British', style: 'Warm', emoji: '👩‍🦰', color: '#ff4488', sample: 'Hi there, I am Lily. Warm British tone, perfect for emotional storytelling.' },
+  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will', gender: 'male', accent: 'American', style: 'Friendly', emoji: '😊', color: '#ffaa00', sample: 'Hey! I am Will. Super friendly and upbeat. Ideal for motivational content.' },
+  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', gender: 'female', accent: 'American', style: 'Expressive', emoji: '🎭', color: '#aa44ff', sample: 'I am Jessica! Expressive and dynamic. I bring energy to every single word.' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'male', accent: 'Australian', style: 'Casual', emoji: '🤙', color: '#00ddaa', sample: 'Hey mate, I am Charlie. Casual Australian accent. Laid back but very engaging.' },
+  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', gender: 'female', accent: 'American', style: 'Warm', emoji: '🌸', color: '#ff88aa', sample: 'Hello, I am Matilda. Gentle and warm. I connect deeply with your audience.' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', gender: 'male', accent: 'British', style: 'Authoritative', emoji: '🎙️', color: '#4488ff', sample: 'I am Daniel. Authoritative British voice. Commands attention from the first second.' },
+  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill', gender: 'male', accent: 'American', style: 'Gruff', emoji: '🗿', color: '#888888', sample: 'I am Bill. Raw, gritty and real. No nonsense delivery that hits hard every time.' },
+  { id: 'z9fAnlkpzviPz146aGWa', name: 'Glinda', gender: 'female', accent: 'American', style: 'Mystical', emoji: '✨', color: '#cc44ff', sample: 'I am Glinda. Mystical and enchanting. Perfect for mysterious and intriguing content.' },
 ]
 
 interface Scene {
@@ -1570,61 +1570,128 @@ export default function Dashboard() {
                           <p className="text-xs text-[#00c8ff]">Powered by <strong>ElevenLabs</strong>. Add <strong>ELEVENLABS_API_KEY</strong> in Vercel → Settings → Environment Variables for real AI voices.</p>
                         </div>
 
-                        {/* Voice grid */}
+                        {/* Premium voice selector */}
                         <div>
-                          <label className="text-xs text-gray-400 font-semibold block mb-2">🎙️ Choose Voice — click ▶ to preview</label>
-                          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                            {elevenLabsVoices.map(v => (
-                              <div key={v.id}
-                                className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all relative cursor-pointer ${selectedElevenVoice.id === v.id ? 'border-[#00c8ff] bg-[#00c8ff]/10' : previewingVoiceId === v.id ? 'border-[#7b2fff] bg-[#7b2fff]/10' : 'border-white/10 hover:border-white/20'}`}
-                                onClick={() => {
-                                  setSelectedElevenVoice(v)
-                                }}>
-                                {/* Emoji + ping */}
-                                <span className="text-lg shrink-0 relative">
-                                  {v.emoji}
-                                  {previewingVoiceId === v.id && (
-                                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#7b2fff] rounded-full animate-ping" />
-                                  )}
-                                </span>
-                                {/* Name */}
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-bold text-white">{v.name}</p>
-                                  <p className="text-[9px] text-gray-500">{v.accent} · {v.style}</p>
-                                </div>
-                                {/* Preview button */}
-                                <button
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    if (previewingVoiceId === v.id) {
-                                      window.speechSynthesis.cancel()
-                                      setPreviewingVoiceId(null)
-                                      return
-                                    }
+                          <label className="text-xs text-gray-400 font-semibold block mb-3">🎙️ Choose Voice — hover to preview</label>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            {elevenLabsVoices.map(v => {
+                              const isSelected = selectedElevenVoice.id === v.id
+                              const isPreviewing = previewingVoiceId === v.id
+                              return (
+                                <div
+                                  key={v.id}
+                                  onClick={() => {
+                                    setSelectedElevenVoice(v)
                                     window.speechSynthesis.cancel()
+                                    setPreviewingVoiceId(null)
+                                  }}
+                                  onMouseEnter={() => {
+                                    if (isPreviewing) return
                                     setPreviewingVoiceId(v.id)
-                                    const utter = new SpeechSynthesisUtterance(
-                                      'Hey! I am ' + v.name + '. I can narrate your YouTube Short in a ' + v.style.toLowerCase() + ' style.'
-                                    )
-                                    utter.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : v.accent === 'Indian' ? 'en-IN' : 'en-US'
-                                    utter.rate = 1.0
-                                    utter.pitch = v.gender === 'female' ? 1.15 : 0.85
+                                    window.speechSynthesis.cancel()
+                                    const utter = new SpeechSynthesisUtterance(v.sample)
+                                    utter.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : 'en-US'
+                                    utter.rate = v.style === 'Deep' || v.style === 'Authoritative' ? 0.9 : v.style === 'Expressive' ? 1.1 : 1.0
+                                    utter.pitch = v.gender === 'female' ? 1.1 : v.style === 'Deep' ? 0.7 : 0.85
                                     utter.volume = 1.0
                                     utter.onend = () => setPreviewingVoiceId(null)
                                     utter.onerror = () => setPreviewingVoiceId(null)
                                     window.speechSynthesis.speak(utter)
                                   }}
-                                  className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all text-xs ${previewingVoiceId === v.id ? 'bg-[#7b2fff] text-white' : 'bg-white/10 text-gray-400 hover:bg-[#00c8ff]/20 hover:text-[#00c8ff]'}`}>
-                                  {previewingVoiceId === v.id ? '⏹' : '▶'}
-                                </button>
-                                {/* Selected check */}
-                                {selectedElevenVoice.id === v.id && previewingVoiceId !== v.id && (
-                                  <span className="shrink-0 text-[#00c8ff] text-xs">✓</span>
-                                )}
-                              </div>
-                            ))}
+                                  onMouseLeave={() => {
+                                    window.speechSynthesis.cancel()
+                                    setPreviewingVoiceId(null)
+                                  }}
+                                  className="relative cursor-pointer rounded-2xl overflow-hidden transition-all duration-200"
+                                  style={{
+                                    border: isSelected
+                                      ? '2px solid ' + v.color
+                                      : isPreviewing
+                                      ? '2px solid ' + v.color + '88'
+                                      : '2px solid rgba(255,255,255,0.07)',
+                                    background: isSelected
+                                      ? v.color + '18'
+                                      : isPreviewing
+                                      ? v.color + '10'
+                                      : 'rgba(255,255,255,0.03)',
+                                    transform: isPreviewing || isSelected ? 'translateY(-2px)' : 'none',
+                                    boxShadow: isSelected
+                                      ? '0 0 20px ' + v.color + '40'
+                                      : isPreviewing
+                                      ? '0 4px 20px ' + v.color + '25'
+                                      : 'none',
+                                  }}>
+
+                                  {/* Sound wave animation when previewing */}
+                                  {isPreviewing && (
+                                    <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden">
+                                      <div className="h-full animate-pulse" style={{ background: 'linear-gradient(90deg, transparent, ' + v.color + ', transparent)', backgroundSize: '200% 100%' }} />
+                                    </div>
+                                  )}
+
+                                  <div className="p-3">
+                                    {/* Top row */}
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-xl"
+                                            style={{ background: v.color + '20', border: '1.5px solid ' + v.color + '40' }}>
+                                            {v.emoji}
+                                          </div>
+                                          {isPreviewing && (
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center"
+                                              style={{ background: v.color }}>
+                                              <div className="flex gap-px items-end h-2">
+                                                {[2,3,4,3,2].map((h,i) => (
+                                                  <div key={i} className="w-px rounded-full animate-bounce bg-black"
+                                                    style={{ height: h * 2 + 'px', animationDelay: i * 0.1 + 's' }} />
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {isSelected && !isPreviewing && (
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-black"
+                                              style={{ background: v.color }}>✓</div>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-black text-white leading-tight">{v.name}</p>
+                                          <p className="text-[9px] mt-0.5" style={{ color: v.color + 'cc' }}>{v.accent}</p>
+                                        </div>
+                                      </div>
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
+                                        style={{ background: v.color + '20', color: v.color }}>
+                                        {v.style}
+                                      </span>
+                                    </div>
+
+                                    {/* Waveform bars */}
+                                    <div className="flex items-center gap-px h-4">
+                                      {[3,5,7,4,8,6,9,5,7,4,6,8,5,7,4,6,5,8,4,6].map((h, i) => (
+                                        <div
+                                          key={i}
+                                          className="flex-1 rounded-full transition-all duration-150"
+                                          style={{
+                                            height: isPreviewing ? h * 1.8 + 'px' : '3px',
+                                            background: isSelected || isPreviewing ? v.color : 'rgba(255,255,255,0.15)',
+                                            opacity: isPreviewing ? 0.6 + Math.sin(i * 0.5) * 0.4 : 1,
+                                            animationDelay: i * 50 + 'ms',
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
+
+                                    {/* Gender badge */}
+                                    <div className="flex items-center justify-between mt-2">
+                                      <span className="text-[9px] text-gray-600">{v.gender === 'female' ? '♀ Female' : '♂ Male'}</span>
+                                      <span className="text-[9px] text-gray-600">{isPreviewing ? '🔊 Playing...' : isSelected ? '✓ Selected' : 'Hover to preview'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
-                          <p className="text-[10px] text-gray-600 mt-1.5">▶ = browser preview &nbsp;|&nbsp; Generate button uses real ElevenLabs AI</p>
+                          <p className="text-[10px] text-gray-600 mt-2 text-center">Hover = browser preview · Generate = real ElevenLabs AI voice</p>
                         </div>
 
                         {/* Voice settings */}
