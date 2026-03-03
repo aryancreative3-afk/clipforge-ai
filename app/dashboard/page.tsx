@@ -75,36 +75,28 @@ function startPrev(v: Voice) {
   stopPrev()
   setPrevId(v.id)
 
-  // Use ElevenLabs preview via API if available, else browser speech
-  fetch('/api/generate-voice', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text: v.sample,
-      voiceId: v.id,
-      settings: { stability: 0.5, similarityBoost: 0.75, speed: 1.0 },
-      preview: true
-    })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (d.audioUrl) {
-      const audio = new Audio(d.audioUrl)
-      audio.onended = () => setPrevId(null)
-      audio.onerror = () => setPrevId(null)
-      audio.play()
-    } else {
-      // fallback browser speech
-      const u = new SpeechSynthesisUtterance(v.sample)
-      u.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : 'en-US'
-      u.pitch = v.gender === 'female' ? 1.1 : v.style === 'Deep' ? 0.7 : 0.85
-      u.rate = v.style === 'Deep' ? 0.9 : 1.0
-      u.onend = () => setPrevId(null)
-      u.onerror = () => setPrevId(null)
-      window.speechSynthesis.speak(u)
+  // Free ElevenLabs sample URLs — no API cost
+  const samples: Record<string, string> = {
+    'EXAVITQu4vr4xnSDxMaL': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/EXAVITQu4vr4xnSDxMaL/preview.mp3',
+    'TX3LPaxmHKxFdv7VOQHJ': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/TX3LPaxmHKxFdv7VOQHJ/preview.mp3',
+    'XB0fDUnXU5powFXDhCwa': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/XB0fDUnXU5powFXDhCwa/preview.mp3',
+    'nPczCjzI2devNBz1zQrb': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/nPczCjzI2devNBz1zQrb/preview.mp3',
+    'pFZP5JQG7iQjIQuC4Bku': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/pFZP5JQG7iQjIQuC4Bku/preview.mp3',
+    'bIHbv24MWmeRgasZH58o': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/bIHbv24MWmeRgasZH58o/preview.mp3',
+    'cgSgspJ2msm6clMCkdW9': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/cgSgspJ2msm6clMCkdW9/preview.mp3',
+    'IKne3meq5aSn9XLyUdCD': 'https://storage.googleapis.com/eleven-public-prod/premade/voices/IKne3meq5aSn9XLyUdCD/preview.mp3',
+  }
+
+  const url = samples[v.id]
+  if (url) {
+    const audio = new Audio(url)
+    audio.onended = () => setPrevId(null)
+    audio.onerror = () => {
+      // fallback to browser speech if URL fails
+      setPrevId(null)
     }
-  })
-  .catch(() => setPrevId(null))
+    audio.play().catch(() => setPrevId(null))
+  }
 }
   function stopPrev(){window.speechSynthesis.cancel();setPrevId(null)}
 
