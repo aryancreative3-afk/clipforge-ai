@@ -76,6 +76,7 @@ export default function Dashboard(){
   const [musicLoad,setMusicLoad]=useState(false)
   const [musicOffset,setMusicOffset]=useState(0)
   const [musicPlaying,setMusicPlaying]=useState(false)
+  const [musicSearch,setMusicSearch]=useState('')
   const musicRef=useRef<HTMLAudioElement|null>(null)
   const tRef=useRef<HTMLTextAreaElement>(null)
 
@@ -156,6 +157,17 @@ export default function Dashboard(){
       if(offset===0)setMusicTracks(d.tracks||[])
       else setMusicTracks(p=>[...p,...(d.tracks||[])])
       if(offset===0&&d.tracks?.[0]&&!musicTrack)setMusicTrack(d.tracks[0])
+    }catch{}
+    setMusicLoad(false)
+  }
+
+  async function fetchMusicBySearch(query:string){
+    setMusicLoad(true)
+    try{
+      const r=await fetch(`/api/background-music?search=${encodeURIComponent(query)}&offset=0`)
+      const d=await r.json()
+      setMusicTracks(d.tracks||[])
+      if(d.tracks?.[0])setMusicTrack(d.tracks[0])
     }catch{}
     setMusicLoad(false)
   }
@@ -497,6 +509,8 @@ export default function Dashboard(){
 
                 {musicOn&&(
                   <div className="space-y-6">
+
+                    {/* Volume */}
                     <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-3">
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Volume</p>
@@ -512,6 +526,23 @@ export default function Dashboard(){
                       <p className="text-[10px] text-white/18">Keep at 15–25% so voiceover stays clear</p>
                     </div>
 
+                    {/* Search */}
+                    <div className="flex gap-2">
+                      <input
+                        value={musicSearch}
+                        onChange={e=>setMusicSearch(e.target.value)}
+                        onKeyDown={e=>{if(e.key==='Enter'&&musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}}
+                        placeholder="Search music… e.g. calm piano, epic drums"
+                        className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/18 focus:outline-none focus:border-white/22 transition-colors"/>
+                      <button
+                        onClick={()=>{if(musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0"
+                        style={{background:'rgba(0,200,255,0.1)',border:'1px solid rgba(0,200,255,0.2)',color:'#00c8ff'}}>
+                        Search
+                      </button>
+                    </div>
+
+                    {/* Genre */}
                     <div>
                       <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">Genre</p>
                       <div className="grid grid-cols-4 gap-2">
@@ -528,7 +559,7 @@ export default function Dashboard(){
                           const active=musicGenre===g.id
                           return(
                             <button key={g.id}
-                              onClick={()=>{setMusicGenre(g.id);setMusicOffset(0);setMusicTracks([]);fetchMusic(g.id,0)}}
+                              onClick={()=>{setMusicGenre(g.id);setMusicOffset(0);setMusicTracks([]);setMusicSearch('');fetchMusic(g.id,0)}}
                               className="p-2.5 rounded-xl border transition-all text-center"
                               style={{borderColor:active?'#00c8ff':'rgba(255,255,255,0.07)',background:active?'rgba(0,200,255,0.1)':'rgba(255,255,255,0.02)',color:active?'#00c8ff':'rgba(255,255,255,0.42)'}}>
                               <div className="text-base mb-1">{g.icon}</div>
@@ -539,13 +570,14 @@ export default function Dashboard(){
                       </div>
                     </div>
 
+                    {/* Tracks */}
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Tracks</p>
                         {musicLoad&&<span className="text-[10px] text-white/20 animate-pulse">Loading…</span>}
                       </div>
                       {musicTracks.length===0&&!musicLoad&&(
-                        <div className="text-center py-8 text-white/20 text-xs">No tracks found — try another genre</div>
+                        <div className="text-center py-8 text-white/20 text-xs">No tracks found — try another genre or search</div>
                       )}
                       <div className="space-y-2">
                         {musicTracks.map(t=>{
@@ -608,7 +640,7 @@ export default function Dashboard(){
                             <span className="text-white/80 font-semibold">{musicTrack.title}</span> by {musicTrack.artist}
                           </p>
                           <p className="text-[10px] text-white/28 mt-0.5">Mixed at {Math.round(musicVol*100)}% · loops to fill {dur}s</p>
-<p className="text-[10px] mt-1" style={{color:'#00c8ff88'}}>⚠️ Required for YouTube → <a href={musicTrack.license} target="_blank" rel="noopener" className="underline ml-1" style={{color:'#00c8ff'}}>CC License</a></p>
+                          <p className="text-[10px] mt-1" style={{color:'#00c8ff88'}}>⚠️ Required for YouTube → <a href={musicTrack.license} target="_blank" rel="noopener" className="underline ml-1" style={{color:'#00c8ff'}}>CC License</a></p>
                         </div>
                       </div>
                     )}
@@ -690,17 +722,17 @@ export default function Dashboard(){
                     ⬇️ Download MP4
                   </a>
                   {musicTrack&&(
-  <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
-    <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">📋 YouTube Attribution — copy this</p>
-    <div className="bg-black/30 rounded-lg p-3">
-      <p className="text-[11px] text-white/55 leading-5 whitespace-pre-line select-all">{`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`}</p>
-    </div>
-    <button onClick={()=>navigator.clipboard.writeText(`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`)}
-      className="w-full py-2 rounded-lg text-xs border border-white/[0.07] text-white/35 hover:text-white/55 transition-all">
-      📋 Copy attribution text
-    </button>
-  </div>
-)}
+                    <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
+                      <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">📋 YouTube Attribution — copy this</p>
+                      <div className="bg-black/30 rounded-lg p-3">
+                        <p className="text-[11px] text-white/55 leading-5 whitespace-pre-line select-all">{`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`}</p>
+                      </div>
+                      <button onClick={()=>navigator.clipboard.writeText(`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`)}
+                        className="w-full py-2 rounded-lg text-xs border border-white/[0.07] text-white/35 hover:text-white/55 transition-all">
+                        📋 Copy attribution text
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               {!rLoad&&!lSetup&&(
