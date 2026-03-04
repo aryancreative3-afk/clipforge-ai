@@ -607,7 +607,8 @@ export default function Dashboard(){
                           <p className="text-xs text-white/55 truncate">
                             <span className="text-white/80 font-semibold">{musicTrack.title}</span> by {musicTrack.artist}
                           </p>
-                          <p className="text-[10px] text-white/28 mt-0.5">Mixed at {Math.round(musicVol*100)}% · loops to fill {dur}s · CC licensed</p>
+                          <p className="text-[10px] text-white/28 mt-0.5">Mixed at {Math.round(musicVol*100)}% · loops to fill {dur}s</p>
+<p className="text-[10px] mt-1" style={{color:'#00c8ff88'}}>⚠️ Required for YouTube → <a href={musicTrack.license} target="_blank" rel="noopener" className="underline ml-1" style={{color:'#00c8ff'}}>CC License</a></p>
                         </div>
                       </div>
                     )}
@@ -688,6 +689,18 @@ export default function Dashboard(){
                     style={{background:'rgba(0,255,136,0.07)',border:'1px solid rgba(0,255,136,0.18)',color:'#00ff88'}}>
                     ⬇️ Download MP4
                   </a>
+                  {musicTrack&&(
+  <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
+    <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">📋 YouTube Attribution — copy this</p>
+    <div className="bg-black/30 rounded-lg p-3">
+      <p className="text-[11px] text-white/55 leading-5 whitespace-pre-line select-all">{`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`}</p>
+    </div>
+    <button onClick={()=>navigator.clipboard.writeText(`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`)}
+      className="w-full py-2 rounded-lg text-xs border border-white/[0.07] text-white/35 hover:text-white/55 transition-all">
+      📋 Copy attribution text
+    </button>
+  </div>
+)}
                 </div>
               )}
               {!rLoad&&!lSetup&&(
