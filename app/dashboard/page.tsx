@@ -32,6 +32,7 @@ async function post(url:string,body:object){
   if(!r.ok) throw new Error((d as any).error||r.statusText)
   return d
 }
+
 export default function Dashboard(){
   const [step,setStep]=useState(0)
   const [topic,setTopic]=useState('')
@@ -44,7 +45,7 @@ export default function Dashboard(){
   const [vscore,setVscore]=useState(0)
   const [gen,setGen]=useState(false)
   const [genErr,setGenErr]=useState('')
-  const [tab,setTab]=useState<'script'|'scenes'|'captions'>('script')
+  const [tab,setTab]=useState<'script'|'scenes'|'captions'|'music'>('script')
   const [cStyle,setCStyle]=useState<'word-by-word'|'full-line'|'none'>('word-by-word')
   const [cColor,setCColor]=useState('#ffffff')
   const [cSize,setCSize]=useState<'small'|'medium'|'large'>('large')
@@ -67,33 +68,42 @@ export default function Dashboard(){
   const [lSetup,setLSetup]=useState(false)
   const [lVars,setLVars]=useState<string[]>([])
   const [hov,setHov]=useState<string|null>(null)
+  const [musicOn,setMusicOn]=useState(true)
+  const [musicVol,setMusicVol]=useState(0.18)
+  const [musicGenre,setMusicGenre]=useState('auto')
+  const [musicTracks,setMusicTracks]=useState<any[]>([])
+  const [musicTrack,setMusicTrack]=useState<any|null>(null)
+  const [musicLoad,setMusicLoad]=useState(false)
+  const [musicOffset,setMusicOffset]=useState(0)
+  const [musicPlaying,setMusicPlaying]=useState(false)
+  const musicRef=useRef<HTMLAudioElement|null>(null)
   const tRef=useRef<HTMLTextAreaElement>(null)
+
   useEffect(()=>{if(step===0)tRef.current?.focus()},[step])
+  useEffect(()=>{if(step===2)fetchMusic(musicGenre,0)},[step])
 
-function startPrev(v: Voice) {
-  if (prevId === v.id) { stopPrev(); return }
-  stopPrev()
-  setPrevId(v.id)
-
-  if (typeof window === 'undefined') return
-
-  // Try browser speechSynthesis (works on desktop + Android)
-  if (window.speechSynthesis) {
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(v.sample)
-    u.lang = v.accent === 'British' ? 'en-GB' : v.accent === 'Australian' ? 'en-AU' : 'en-US'
-    u.pitch = v.gender === 'female' ? 1.1 : v.style === 'Deep' ? 0.7 : 0.85
-    u.rate = v.style === 'Deep' ? 0.9 : 1.0
-    u.volume = 1.0
-    u.onend = () => setPrevId(null)
-    u.onerror = () => setPrevId(null)
-    window.speechSynthesis.speak(u)
+  function startPrev(v:Voice){
+    if(prevId===v.id){stopPrev();return}
+    stopPrev()
+    setPrevId(v.id)
+    if(typeof window==='undefined')return
+    if(window.speechSynthesis){
+      window.speechSynthesis.cancel()
+      const u=new SpeechSynthesisUtterance(v.sample)
+      u.lang=v.accent==='British'?'en-GB':v.accent==='Australian'?'en-AU':'en-US'
+      u.pitch=v.gender==='female'?1.1:v.style==='Deep'?0.7:0.85
+      u.rate=v.style==='Deep'?0.9:1.0
+      u.volume=1.0
+      u.onend=()=>setPrevId(null)
+      u.onerror=()=>setPrevId(null)
+      window.speechSynthesis.speak(u)
+    }
   }
-}
+
   function stopPrev(){
-  if(typeof window!=='undefined'&&window.speechSynthesis) window.speechSynthesis.cancel()
-  setPrevId(null)
-}
+    if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel()
+    setPrevId(null)
+  }
 
   async function generate(){
     if(!topic.trim())return
@@ -120,10 +130,34 @@ function startPrev(v: Voice) {
     setGen(false)
   }
 
+  function useSampleScript(){
+    setScript(`HOOK: Did you know that ${topic}?\n\nSTORY: Here is what experts discovered about this fascinating topic. The research shows surprising results that most people have never heard about.\n\nThis changes everything we thought we knew.\n\nCTA: Follow for more mind-blowing facts every day!`)
+    setScenes([
+      {id:1,text:`Did you know that ${topic}?`,searchQuery:topic.split(' ').slice(0,3).join(' '),type:'hook' as const,mediaType:'video' as const,durationSeconds:8},
+      {id:2,text:'Here is what experts discovered...',searchQuery:topic.split(' ').slice(0,2).join(' ')+' discovery',type:'story' as const,mediaType:'video' as const,durationSeconds:20},
+      {id:3,text:'This changes everything we knew',searchQuery:'mind blown revelation cinematic',type:'story' as const,mediaType:'video' as const,durationSeconds:15},
+      {id:4,text:'Follow for more!',searchQuery:'subscribe social media',type:'cta' as const,mediaType:'video' as const,durationSeconds:7},
+    ])
+    setVscore(72)
+    setStep(2)
+  }
+
   async function doMagic(){
     if(!mText.trim()||!script)return;setMLoad(true)
     try{const d=await post('/api/magic',{script,instruction:mText});if(d.rewrittenScript)setScript(d.rewrittenScript);setMText('');setMagic(false)}catch{}
     setMLoad(false)
+  }
+
+  async function fetchMusic(genre='auto',offset=0){
+    setMusicLoad(true)
+    try{
+      const r=await fetch(`/api/background-music?genre=${genre}&style=${style}&offset=${offset}`)
+      const d=await r.json()
+      if(offset===0)setMusicTracks(d.tracks||[])
+      else setMusicTracks(p=>[...p,...(d.tracks||[])])
+      if(offset===0&&d.tracks?.[0]&&!musicTrack)setMusicTrack(d.tracks[0])
+    }catch{}
+    setMusicLoad(false)
   }
 
   async function genVoice(){
@@ -141,7 +175,9 @@ function startPrev(v: Voice) {
     try{
       const r=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         scenes:scenes.map(s=>({id:s.id,text:s.text,mediaUrl:s.mediaUrl||'',mediaType:s.mediaType,type:s.type,durationSeconds:s.durationSeconds})),
-        audioUrl:aUrl||'',captionStyle:cStyle,captionColor:cColor,captionSize:cSize,brandColor:bColor,title:topic
+        audioUrl:aUrl||'',captionStyle:cStyle,captionColor:cColor,captionSize:cSize,brandColor:bColor,title:topic,
+        musicUrl:musicOn&&musicTrack?musicTrack.audio:'',
+        musicVolume:musicVol,
       })})
       const d=await r.json()
       if(d.setupRequired){setLSetup(true);setLVars(d.missingVars||[]);setRLoad(false);return}
@@ -257,7 +293,8 @@ function startPrev(v: Voice) {
                 {VOICES.map(v=>{
                   const sel=voice.id===v.id,prev=prevId===v.id
                   return(
-                    <div key={v.id} onClick={()=>setVoice(v)} onTouchStart={(e)=>{e.preventDefault();if(prevId===v.id){stopPrev()}else{startPrev(v)}}}
+                    <div key={v.id} onClick={()=>setVoice(v)}
+                      onTouchStart={(e)=>{e.preventDefault();if(prevId===v.id){stopPrev()}else{startPrev(v)}}}
                       className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-150 border select-none"
                       style={{borderColor:sel?v.color:prev?v.color+'55':'rgba(255,255,255,0.07)',background:sel?v.color+'13':prev?v.color+'08':'rgba(255,255,255,0.02)',transform:prev?'translateY(-1px)':'none',boxShadow:sel?'0 0 20px '+v.color+'28':'none'}}>
                       <div className="relative shrink-0">
@@ -283,9 +320,7 @@ function startPrev(v: Voice) {
                   )
                 })}
               </div>
-              <p className="text-[10px] text-white/18 mt-2 text-center">
-  {'Tap or click to preview · Tap again to stop'}
-</p>
+              <p className="text-[10px] text-white/18 mt-2 text-center">Tap or click to preview · Tap again to stop</p>
             </div>
             <div className="flex gap-3">
               <button onClick={()=>setStep(0)} className="px-5 py-3 rounded-xl text-sm text-white/32 border border-white/[0.07] hover:text-white/52 transition-all">← Back</button>
@@ -295,6 +330,10 @@ function startPrev(v: Voice) {
                 {gen?(<><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Generating…</>):'Generate Script →'}
               </button>
             </div>
+            <button onClick={useSampleScript} disabled={topic.trim().length<3}
+              className="w-full py-2 rounded-xl text-xs text-white/25 border border-white/[0.06] hover:text-white/45 hover:border-white/12 transition-all disabled:opacity-20">
+              ⚡ Skip — use sample script (no credits needed)
+            </button>
             {genErr&&<p className="text-xs text-red-400 text-center">{genErr}</p>}
           </div>
         )}
@@ -315,10 +354,10 @@ function startPrev(v: Voice) {
               )}
             </div>
             <div className="flex gap-0.5 p-1 bg-white/[0.04] border border-white/[0.05] rounded-xl w-fit">
-              {(['script','scenes','captions'] as const).map(t=>(
+              {(['script','scenes','captions','music'] as const).map(t=>(
                 <button key={t} onClick={()=>setTab(t)} className="px-4 py-1.5 rounded-lg text-xs font-medium capitalize transition-all"
                   style={{background:tab===t?'rgba(255,255,255,0.09)':'transparent',color:tab===t?'white':'rgba(255,255,255,0.32)'}}>
-                  {t==='script'?'📝 Script':t==='scenes'?'🎬 Scenes':'💬 Captions'}
+                  {t==='script'?'📝 Script':t==='scenes'?'🎬 Scenes':t==='captions'?'💬 Captions':'🎵 Music'}
                 </button>
               ))}
             </div>
@@ -434,6 +473,146 @@ function startPrev(v: Voice) {
                     <input type="color" value={bColor} onChange={e=>setBColor(e.target.value)} className="w-7 h-7 rounded-full cursor-pointer bg-transparent border border-white/15"/>
                   </div>}
                 </div>
+              </div>
+            )}
+
+            {tab==='music'&&(
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/[0.07] rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+                      style={{background:'rgba(0,200,255,0.07)',border:'1px solid rgba(0,200,255,0.14)'}}>🎵</div>
+                    <div>
+                      <p className="text-sm font-semibold">Background Music</p>
+                      <p className="text-[10px] text-white/28 mt-0.5">Jamendo · royalty-free · loops to video length</p>
+                    </div>
+                  </div>
+                  <button onClick={()=>setMusicOn(o=>!o)}
+                    className="w-11 h-6 rounded-full transition-all relative shrink-0"
+                    style={{background:musicOn?'#00c8ff':'rgba(255,255,255,0.1)'}}>
+                    <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200"
+                      style={{left:musicOn?'calc(100% - 22px)':'2px'}}/>
+                  </button>
+                </div>
+
+                {musicOn&&(
+                  <div className="space-y-6">
+                    <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-3">
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Volume</p>
+                        <span className="text-xs font-bold" style={{color:'#00c8ff'}}>{Math.round(musicVol*100)}%</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-base">🔈</span>
+                        <input type="range" min={0} max={0.6} step={0.01} value={musicVol}
+                          onChange={e=>{const v=+e.target.value;setMusicVol(v);if(musicRef.current)musicRef.current.volume=v}}
+                          className="flex-1" style={{accentColor:'#00c8ff'}}/>
+                        <span className="text-base">🔊</span>
+                      </div>
+                      <p className="text-[10px] text-white/18">Keep at 15–25% so voiceover stays clear</p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">Genre</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          {id:'auto',label:'Auto',icon:'✨'},
+                          {id:'cinematic',label:'Cinematic',icon:'🎬'},
+                          {id:'upbeat',label:'Upbeat',icon:'⚡'},
+                          {id:'lofi',label:'Lo-Fi',icon:'☕'},
+                          {id:'dramatic',label:'Dramatic',icon:'🌩️'},
+                          {id:'inspirational',label:'Inspire',icon:'🌅'},
+                          {id:'dark',label:'Dark',icon:'🌑'},
+                          {id:'happy',label:'Happy',icon:'😊'},
+                        ].map(g=>{
+                          const active=musicGenre===g.id
+                          return(
+                            <button key={g.id}
+                              onClick={()=>{setMusicGenre(g.id);setMusicOffset(0);setMusicTracks([]);fetchMusic(g.id,0)}}
+                              className="p-2.5 rounded-xl border transition-all text-center"
+                              style={{borderColor:active?'#00c8ff':'rgba(255,255,255,0.07)',background:active?'rgba(0,200,255,0.1)':'rgba(255,255,255,0.02)',color:active?'#00c8ff':'rgba(255,255,255,0.42)'}}>
+                              <div className="text-base mb-1">{g.icon}</div>
+                              <div className="text-[9px] font-semibold leading-tight">{g.label}</div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Tracks</p>
+                        {musicLoad&&<span className="text-[10px] text-white/20 animate-pulse">Loading…</span>}
+                      </div>
+                      {musicTracks.length===0&&!musicLoad&&(
+                        <div className="text-center py-8 text-white/20 text-xs">No tracks found — try another genre</div>
+                      )}
+                      <div className="space-y-2">
+                        {musicTracks.map(t=>{
+                          const active=musicTrack?.id===t.id
+                          const mins=Math.floor(t.duration/60)
+                          const secs=String(t.duration%60).padStart(2,'0')
+                          return(
+                            <div key={t.id}
+                              onClick={()=>{
+                                setMusicTrack(t)
+                                if(musicRef.current){musicRef.current.src=t.audio;musicRef.current.volume=musicVol;musicRef.current.play().then(()=>setMusicPlaying(true)).catch(()=>{})}
+                              }}
+                              className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-150"
+                              style={{borderColor:active?'#00c8ff':'rgba(255,255,255,0.07)',background:active?'rgba(0,200,255,0.08)':'rgba(255,255,255,0.02)',transform:active?'translateY(-1px)':'none',boxShadow:active?'0 4px 16px rgba(0,200,255,0.12)':'none'}}>
+                              <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-white/[0.05] flex items-center justify-center" style={{border:'1px solid rgba(255,255,255,0.07)'}}>
+                                {t.image?<img src={t.image} alt="" className="w-full h-full object-cover"/>:<span className="text-base">🎵</span>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-white/80 truncate">{t.title}</p>
+                                <p className="text-[10px] text-white/28 truncate">{t.artist} · {mins}:{secs}</p>
+                              </div>
+                              {active&&musicPlaying
+                                ?<div className="flex gap-px items-end shrink-0" style={{height:14}}>
+                                  {[3,5,7,4,6,5,3].map((h,i)=><div key={i} className="w-0.5 rounded-full animate-bounce" style={{height:h*1.8,background:'#00c8ff',animationDelay:i*80+'ms'}}/>)}
+                                </div>
+                                :active
+                                  ?<span className="text-[10px] font-bold shrink-0" style={{color:'#00c8ff'}}>✓</span>
+                                  :<span className="text-[10px] text-white/18 shrink-0">▶</span>
+                              }
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {musicTracks.length>0&&(
+                        <button onClick={()=>{const next=musicOffset+10;setMusicOffset(next);fetchMusic(musicGenre,next)}} disabled={musicLoad}
+                          className="w-full mt-3 py-2.5 rounded-xl border border-dashed border-white/08 text-xs text-white/25 hover:text-white/42 hover:border-white/14 transition-all disabled:opacity-30">
+                          {musicLoad?'Loading…':'Load more tracks'}
+                        </button>
+                      )}
+                    </div>
+
+                    {musicPlaying&&(
+                      <button onClick={()=>{musicRef.current?.pause();setMusicPlaying(false)}}
+                        className="w-full py-2 rounded-xl border border-white/[0.07] text-xs text-white/35 hover:text-white/55 transition-all">
+                        ⏹ Stop preview
+                      </button>
+                    )}
+
+                    <audio ref={musicRef} loop preload="none"
+                      onPlay={()=>setMusicPlaying(true)}
+                      onPause={()=>setMusicPlaying(false)}
+                      onEnded={()=>setMusicPlaying(false)}/>
+
+                    {musicTrack&&(
+                      <div className="flex items-center gap-2.5 p-3 rounded-xl border"
+                        style={{background:'rgba(0,200,255,0.05)',borderColor:'rgba(0,200,255,0.18)'}}>
+                        <span className="text-base">✅</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-white/55 truncate">
+                            <span className="text-white/80 font-semibold">{musicTrack.title}</span> by {musicTrack.artist}
+                          </p>
+                          <p className="text-[10px] text-white/28 mt-0.5">Mixed at {Math.round(musicVol*100)}% · loops to fill {dur}s · CC licensed</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
