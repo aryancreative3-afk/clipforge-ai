@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const GENRE_QUERIES: Record<string, string> = {
-  cinematic:    'cinematic epic orchestral',
-  upbeat:       'upbeat energetic pop',
-  lofi:         'lofi chill relaxing',
-  dramatic:     'dramatic tense suspense',
-  inspirational:'inspirational motivational piano',
-  corporate:    'corporate background smooth',
-  dark:         'dark ambient mysterious',
-  happy:        'happy cheerful bright',
+const GENRE_TAGS: Record<string, string> = {
+  cinematic:     'cinematic orchestral',
+  upbeat:        'upbeat energetic',
+  lofi:          'lofi chill',
+  dramatic:      'dramatic intense',
+  inspirational: 'inspirational piano',
+  corporate:     'corporate background',
+  dark:          'dark ambient',
+  happy:         'happy positive',
 }
 
 const STYLE_GENRE_MAP: Record<string, string> = {
@@ -22,43 +22,57 @@ const STYLE_GENRE_MAP: Record<string, string> = {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const genre  = searchParams.get('genre') || 'cinematic'
+  const genre  = searchParams.get('genre') || 'auto'
   const style  = searchParams.get('style') || ''
-  const page   = searchParams.get('page') || '1'
+  const offset = searchParams.get('offset') || '0'
 
-  const resolvedGenre = style && STYLE_GENRE_MAP[style] ? STYLE_GENRE_MAP[style] : genre
-  const query = GENRE_QUERIES[resolvedGenre] || GENRE_QUERIES['cinematic']
+  const clientId = process.env.JAMENDO_CLIENT_ID
+  if (!clientId) {
+    return NextResponse.json({ error: 'JAMENDO_CLIENT_ID missing' }, { status: 500 })
+  }
 
-  const key = process.env.PIXABAY_API_KEY
-  if (!key) return NextResponse.json({ error: 'PIXABAY_API_KEY missing' }, { status: 500 })
+  const resolvedGenre = genre === 'auto'
+    ? (STYLE_GENRE_MAP[style] || 'cinematic')
+    : genre
 
-  const url = `https://pixabay.com/api/videos/?key=${key}&q=${encodeURIComponent(query)}&video_type=music&per_page=10&page=${page}&safesearch=true`
-  // Pixabay music endpoint
-  const musicUrl = `https://pixabay.com/api/?key=${key}&q=${encodeURIComponent(query)}&per_page=10&page=${page}&safesearch=true`
+  const tags = GENRE_TAGS[resolvedGenre] || GENRE_TAGS['cinematic']
+
+  const url = new URL('https://api.jamendo.com/v3.0/tracks/')
+  url.searchParams.set('client_id', clientId)
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('limit', '10')
+  url.searchParams.set('offset', offset)
+  url.searchParams.set('tags', tags)
+  url.searchParams.set('audioformat', 'mp31')
+  url.searchParams.set('include', 'musicinfo')
+  url.searchParams.set('groupby', 'artist_id')
+  url.searchParams.set('order', 'popularity_total')
+  url.searchParams.set('fuzzytags', '1')
 
   try {
-    // Use Pixabay music search
-    const r = await fetch(
-      `https://pixabay.com/api/music/?key=${key}&q=${encodeURIComponent(query)}&per_page=10&page=${page}`
-    )
+    const r = await fetch(url.toString())
     const d = await r.json()
-    const tracks = (d.hits || []).map((t: any) => ({
+
+    if (d.headers?.status !== 'success') {
+      return NextResponse.json(
+        { error: d.headers?.error_message || 'Jamendo error' },
+        { status: 500 }
+      )
+    }
+
+    const tracks = (d.results || []).map((t: any) => ({
       id:       t.id,
-      title:    t.title || t.tags?.split(',')[0] || 'Track',
-      artist:   t.user || 'Unknown',
-      duration: t.duration,
-      url:      t.audio?.url || t.url,
+      title:    t.name,
+      artist:   t.artist_name,
+      duration: parseInt(t.duration),
+      audio:    t.audio,
+      image:    t.album_image || t.image,
       genre:    resolvedGenre,
+      license:  t.license_ccurl,
     }))
+
     return NextResponse.json({ tracks, genre: resolvedGenre })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
-```
-
----
-
-## File 2 — Add `PIXABAY_API_KEY` to your `.env.local`
-```
-PIXABAY_API_KEY=your_key_here
