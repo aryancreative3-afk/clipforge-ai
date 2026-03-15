@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Submit render
-    const r = await fetch('https://api.shotstack.io/v1/render', {
+    const r = await fetch('https://api.shotstack.io/stage/render', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(payload),
     })
     const d = await r.json()
-    if (!r.ok) return NextResponse.json({ error: d.message || 'Shotstack error' }, { status: 500 })
+    if (!r.ok) return NextResponse.json({ error: d.message || JSON.stringify(d) || 'Shotstack error' }, { status: 500 })
     return NextResponse.json({ renderId: d.response?.id, provider: 'shotstack' })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
   if (!renderId) return NextResponse.json({ error: 'renderId required' }, { status: 400 })
 
   try {
-    const r = await fetch(`https://api.shotstack.io/v1/render/${renderId}`, {
+    const r = await fetch(`https://api.shotstack.io/stage/render/${renderId}`, {
       headers: { 'x-api-key': key },
     })
     const d = await r.json()

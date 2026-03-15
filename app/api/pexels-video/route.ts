@@ -5,7 +5,7 @@ export async function GET(req: NextRequest) {
   const query = searchParams.get('query') || 'nature'
   const perPage = searchParams.get('per_page') || '6'
 
-  const apiKey = process.env.PEXELS_API_KEY
+  const apiKey = process.env.NEXT_PUBLIC_PEXELS_API_KEY
   if (!apiKey) {
     // Return placeholder videos if no key
     const placeholders = Array.from({ length: 6 }, (_, i) => ({
