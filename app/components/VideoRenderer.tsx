@@ -21,7 +21,6 @@ interface Props {
   onError: (err: string) => void
 }
 
-// Proxy media through our own API to avoid CORS
 async function proxyFetch(url: string): Promise<Uint8Array> {
   const res = await fetch(`/api/proxy-media?url=${encodeURIComponent(url)}`)
   if (!res.ok) throw new Error(`Failed to fetch: ${url}`)
@@ -48,11 +47,11 @@ export default function VideoRenderer({
 
       const ffmpeg = new FFmpeg()
 
-      ffmpeg.on('log', ({ message }) => {
+      ffmpeg.on('log', ({ message }: { message: string }) => {
         console.log('[FFmpeg]', message)
       })
 
-      ffmpeg.on('progress', ({ progress: p }) => {
+      ffmpeg.on('progress', ({ progress: p }: { progress: number }) => {
         setProgress(Math.round(30 + p * 60))
         setStatusText(
           p < 0.3 ? 'Processing scenes…' :
@@ -61,7 +60,7 @@ export default function VideoRenderer({
         )
       })
 
-      setStatusText('Loading FFmpeg core (first time may take ~30s)…')
+      setStatusText('Loading FFmpeg core (first time ~30s)…')
       await ffmpeg.load({
         coreURL: await toBlobURL(
           'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
@@ -81,7 +80,6 @@ export default function VideoRenderer({
       const concatParts: string[] = []
       let inputIndex = 0
 
-      // Download each scene
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i]
         const duration = Math.max(2, scene.durationSeconds || 5)
@@ -95,7 +93,6 @@ export default function VideoRenderer({
             const fname = `scene_${i}.${ext}`
             await ffmpeg.writeFile(fname, data)
             inputs.push(fname)
-
             if (scene.mediaType === 'image') {
               filterParts.push(
                 `[${inputIndex}:v]loop=loop=-1:size=1:start=0,` +
@@ -114,15 +111,11 @@ export default function VideoRenderer({
             inputIndex++
           } catch (err) {
             console.warn(`Scene ${i} media failed, using black:`, err)
-            filterParts.push(
-              `color=black:size=1080x1920:duration=${duration}:rate=30[v${i}]`
-            )
+            filterParts.push(`color=black:size=1080x1920:duration=${duration}:rate=30[v${i}]`)
             concatParts.push(`[v${i}]`)
           }
         } else {
-          filterParts.push(
-            `color=black:size=1080x1920:duration=${duration}:rate=30[v${i}]`
-          )
+          filterParts.push(`color=black:size=1080x1920:duration=${duration}:rate=30[v${i}]`)
           concatParts.push(`[v${i}]`)
         }
       }
@@ -132,7 +125,6 @@ export default function VideoRenderer({
 
       const ffArgs: string[] = []
 
-      // Input files
       for (const inp of inputs) {
         if (inp.endsWith('.jpg') || inp.endsWith('.png')) {
           ffArgs.push('-loop', '1', '-i', inp)
@@ -141,7 +133,6 @@ export default function VideoRenderer({
         }
       }
 
-      // Voiceover
       let hasAudio = false
       if (audioUrl) {
         try {
@@ -156,7 +147,6 @@ export default function VideoRenderer({
         }
       }
 
-      // Background music
       let hasMusicAudio = false
       if (musicUrl) {
         try {
@@ -174,10 +164,8 @@ export default function VideoRenderer({
       setProgress(45)
       setStatusText('Rendering video…')
 
-      // Filter complex
       const concatFilter = `${concatParts.join('')}concat=n=${scenes.length}:v=1:a=0[outv]`
       let filterComplex = [...filterParts, concatFilter].join(';')
-
       let audioMapArgs: string[] = []
 
       if (hasAudio && hasMusicAudio) {
@@ -197,42 +185,37 @@ export default function VideoRenderer({
       ffArgs.push('-filter_complex', filterComplex)
       ffArgs.push('-map', '[outv]')
       if (audioMapArgs.length) ffArgs.push(...audioMapArgs)
-      ffArgs.push(
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-movflags', '+faststart',
-        '-y',
-        'output.mp4'
-      )
+      ffArgs.push('-c:v','libx264','-preset','ultrafast','-crf','28','-c:a','aac','-b:a','128k','-movflags','+faststart','-y','output.mp4')
 
       await ffmpeg.exec(ffArgs)
 
       setProgress(94)
       setStatusText('Preparing download…')
 
-      const data = await ffmpeg.readFile('output.mp4') as Uint8Array
-      const blob = new Blob([data], { type: 'video/mp4' })
-      const url = URL.createObjectURL(blob)
+      // FIX: use unknown cast to handle all return types safely
+      const fileData = await ffmpeg.readFile('output.mp4')
+const uint8 = fileData instanceof Uint8Array
+        ? fileData
+        : new Uint8Array(fileData as unknown as ArrayBuffer)
+      const blob = new Blob([uint8.buffer as ArrayBuffer], { type: 'video/mp4' })
+      const objectUrl = URL.createObjectURL(blob)
 
       setProgress(100)
       setStatus('done')
       setStatusText('Done!')
-      onComplete(url)
+      onComplete(objectUrl)
 
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'FFmpeg render failed'
       console.error('FFmpeg error:', e)
       setStatus('error')
-      onError(e.message || 'FFmpeg render failed — check browser console for details')
+      onError(msg)
     }
   }, [scenes, audioUrl, musicUrl, musicVolume, captionColor, topic, onComplete, onError])
 
   return (
     <div className="space-y-3">
       <canvas ref={canvasRef} className="hidden"/>
-
       {status === 'idle' && (
         <button onClick={renderVideo}
           className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
@@ -240,7 +223,6 @@ export default function VideoRenderer({
           🎬 Render in Browser (Free)
         </button>
       )}
-
       {(status === 'loading' || status === 'rendering') && (
         <div className="space-y-2">
           <div className="flex justify-between text-xs">
@@ -251,12 +233,9 @@ export default function VideoRenderer({
             <div className="h-full rounded-full transition-all duration-500"
               style={{width:`${progress}%`,background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/>
           </div>
-          <p className="text-[10px] text-white/20 text-center">
-            Rendering in your browser — do not close this tab
-          </p>
+          <p className="text-[10px] text-white/20 text-center">Rendering in your browser — do not close this tab</p>
         </div>
       )}
-
       {status === 'error' && (
         <div className="space-y-2">
           <button onClick={()=>{setStatus('idle');setProgress(0);setStatusText('')}}
@@ -267,7 +246,6 @@ export default function VideoRenderer({
           <p className="text-[10px] text-white/25 text-center">Or try the Shotstack tab for cloud rendering</p>
         </div>
       )}
-
       {status === 'done' && (
         <button onClick={()=>{setStatus('idle');setProgress(0)}}
           className="w-full py-2 rounded-xl text-xs border border-white/[0.07] text-white/35 hover:text-white/55 transition-all">

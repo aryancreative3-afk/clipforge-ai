@@ -2,7 +2,18 @@
 import { useState, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 
-const VideoRenderer = dynamic(() => import('@/components/VideoRenderer'), { ssr: false })
+// FIX: import from app/components not @/components
+const VideoRenderer = dynamic(
+  () => import('@/app/components/VideoRenderer'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full py-3 rounded-xl text-sm text-center text-white/25 border border-white/[0.06]">
+        Loading renderer…
+      </div>
+    )
+  }
+)
 
 interface Scene { id:number; text:string; searchQuery:string; type:'hook'|'story'|'cta'; durationSeconds:number; mediaUrl?:string; mediaType:'video'|'image'; pexelsResults?:PV[] }
 interface PV { id:number; thumbnail:string; bestUrl:string; duration:number; photographer:string; type:'video'|'image' }
@@ -51,7 +62,6 @@ export default function Dashboard(){
   const [tab,setTab]=useState<'script'|'scenes'|'captions'|'music'>('script')
   const [cStyle,setCStyle]=useState<'word-by-word'|'full-line'|'none'>('word-by-word')
   const [cColor,setCColor]=useState('#ffffff')
-  const [cSize,setCSize]=useState<'small'|'medium'|'large'>('large')
   const [bColor,setBColor]=useState('#00c8ff')
   const [showB,setShowB]=useState(false)
   const [magic,setMagic]=useState(false)
@@ -189,11 +199,7 @@ export default function Dashboard(){
     try{
       const r=await fetch('/api/render-shotstack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         scenes:scenes.map(s=>({id:s.id,text:s.text,mediaUrl:s.mediaUrl||'',mediaType:s.mediaType,type:s.type,durationSeconds:s.durationSeconds})),
-        audioUrl:aUrl||'',
-        musicUrl:musicOn&&musicTrack?musicTrack.audio:'',
-        musicVolume:musicVol,
-        captionColor:cColor,
-        title:topic,
+        audioUrl:aUrl||'',musicUrl:musicOn&&musicTrack?musicTrack.audio:'',musicVolume:musicVol,captionColor:cColor,title:topic,
       })})
       const d=await r.json()
       if(!r.ok)throw new Error(d.error||'Shotstack submission failed')
@@ -219,8 +225,6 @@ export default function Dashboard(){
 
   return(
     <div className="min-h-screen bg-[#0d0d0f] text-white" style={{fontFamily:'"Inter",system-ui,sans-serif'}}>
-
-      {/* NAV */}
       <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0d0d0f]/90 backdrop-blur-xl">
         <div className="max-w-2xl mx-auto px-5 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5 shrink-0">
@@ -247,7 +251,6 @@ export default function Dashboard(){
 
       <main className="max-w-2xl mx-auto px-5 py-14">
 
-        {/* STEP 0 — TOPIC */}
         {step===0&&(
           <div className="space-y-9">
             <div>
@@ -277,13 +280,10 @@ export default function Dashboard(){
             </div>
             <button onClick={()=>setStep(1)} disabled={topic.trim().length<5}
               className="w-full py-3.5 rounded-xl font-semibold text-sm text-black transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-              style={{background:'linear-gradient(135deg,#00c8ff,#7b2fff)'}}>
-              Continue →
-            </button>
+              style={{background:'linear-gradient(135deg,#00c8ff,#7b2fff)'}}>Continue →</button>
           </div>
         )}
 
-        {/* STEP 1 — STYLE & VOICE */}
         {step===1&&(
           <div className="space-y-9">
             <div>
@@ -314,13 +314,7 @@ export default function Dashboard(){
                       style={{borderColor:sel?v.color:prev?v.color+'55':'rgba(255,255,255,0.07)',background:sel?v.color+'13':prev?v.color+'08':'rgba(255,255,255,0.02)',transform:prev?'translateY(-1px)':'none',boxShadow:sel?'0 0 20px '+v.color+'28':'none'}}>
                       <div className="relative shrink-0">
                         <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg" style={{background:v.color+'14',border:'1.5px solid '+v.color+'28'}}>{v.emoji}</div>
-                        {prev&&(
-                          <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{background:v.color}}>
-                            <div className="flex gap-px items-end" style={{height:8}}>
-                              {[1,2,3,2,1].map((h,i)=><div key={i} className="w-px rounded-full bg-black animate-bounce" style={{height:h*2,animationDelay:i*80+'ms'}}/>)}
-                            </div>
-                          </div>
-                        )}
+                        {prev&&(<div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{background:v.color}}><div className="flex gap-px items-end" style={{height:8}}>{[1,2,3,2,1].map((h,i)=><div key={i} className="w-px rounded-full bg-black animate-bounce" style={{height:h*2,animationDelay:i*80+'ms'}}/>)}</div></div>)}
                         {sel&&!prev&&<div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-black" style={{background:v.color}}>✓</div>}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -328,9 +322,7 @@ export default function Dashboard(){
                         <button onClick={e=>{e.stopPropagation();if(prevId===v.id){stopPrev()}else{startPrev(v)}}} className="text-[9px] px-1.5 py-0.5 rounded-md mt-0.5 transition-all" style={{background:prevId===v.id?v.color+'30':'rgba(255,255,255,0.07)',color:prevId===v.id?v.color:'rgba(255,255,255,0.4)',border:'1px solid '+(prevId===v.id?v.color+'50':'rgba(255,255,255,0.1)')}}>{prevId===v.id?'■ stop':'▶ play'}</button>
                         <p className="text-[10px] text-white/30 mt-0.5">{v.accent} · {v.style}</p>
                       </div>
-                      <div className="flex items-center gap-px shrink-0" style={{height:14}}>
-                        {[3,5,7,4,6,5,7].map((h,i)=><div key={i} className="w-0.5 rounded-full transition-all duration-100" style={{height:prev?h:2,background:sel||prev?v.color:'rgba(255,255,255,0.12)'}}/>)}
-                      </div>
+                      <div className="flex items-center gap-px shrink-0" style={{height:14}}>{[3,5,7,4,6,5,7].map((h,i)=><div key={i} className="w-0.5 rounded-full transition-all duration-100" style={{height:prev?h:2,background:sel||prev?v.color:'rgba(255,255,255,0.12)'}}/>)}</div>
                     </div>
                   )
                 })}
@@ -353,7 +345,6 @@ export default function Dashboard(){
           </div>
         )}
 
-        {/* STEP 2 — SCRIPT */}
         {step===2&&(
           <div className="space-y-5">
             <div className="flex items-start justify-between">
@@ -361,12 +352,7 @@ export default function Dashboard(){
                 <h1 className="text-[2rem] font-bold tracking-tight">Your Script</h1>
                 <p className="text-white/32 text-sm mt-1">Edit freely, then export.</p>
               </div>
-              {vscore>0&&(
-                <div className="text-right shrink-0 ml-4">
-                  <div className="text-[2.2rem] font-black leading-none" style={{color:sc}}>{vscore}</div>
-                  <div className="text-[9px] text-white/25 mt-0.5 uppercase tracking-wider">Viral Score</div>
-                </div>
-              )}
+              {vscore>0&&(<div className="text-right shrink-0 ml-4"><div className="text-[2.2rem] font-black leading-none" style={{color:sc}}>{vscore}</div><div className="text-[9px] text-white/25 mt-0.5 uppercase tracking-wider">Viral Score</div></div>)}
             </div>
             <div className="flex gap-0.5 p-1 bg-white/[0.04] border border-white/[0.05] rounded-xl w-fit">
               {(['script','scenes','captions','music'] as const).map(t=>(
@@ -381,11 +367,7 @@ export default function Dashboard(){
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <button onClick={()=>setMagic(o=>!o)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-white/[0.08] text-white/35 hover:text-white/60 hover:border-white/14 transition-all">✨ AI Edit</button>
-                  {magic&&(<>
-                    <input value={mText} onChange={e=>setMText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doMagic()} placeholder="e.g. Make the hook more dramatic…" autoFocus
-                      className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/18 focus:outline-none focus:border-white/22 transition-colors"/>
-                    <button onClick={doMagic} disabled={mLoad||!mText.trim()} className="px-3 py-1.5 rounded-xl text-xs font-medium disabled:opacity-40" style={{background:'#7b2fff',color:'white'}}>{mLoad?'…':'Apply'}</button>
-                  </>)}
+                  {magic&&(<><input value={mText} onChange={e=>setMText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doMagic()} placeholder="e.g. Make the hook more dramatic…" autoFocus className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/18 focus:outline-none focus:border-white/22 transition-colors"/><button onClick={doMagic} disabled={mLoad||!mText.trim()} className="px-3 py-1.5 rounded-xl text-xs font-medium disabled:opacity-40" style={{background:'#7b2fff',color:'white'}}>{mLoad?'…':'Apply'}</button></>)}
                 </div>
                 <textarea value={script} onChange={e=>setScript(e.target.value)} rows={18}
                   className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-4 py-3.5 text-sm text-white/72 leading-7 resize-none focus:outline-none focus:border-white/16 transition-colors"/>
@@ -398,16 +380,11 @@ export default function Dashboard(){
                 {scenes.map((sc2,idx)=>(
                   <div key={sc2.id} className="bg-white/[0.025] border border-white/[0.07] rounded-xl overflow-hidden">
                     <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-white/[0.05]">
-                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full"
-                        style={{background:sc2.type==='hook'?'rgba(0,200,255,0.12)':sc2.type==='cta'?'rgba(255,107,53,0.12)':'rgba(123,47,255,0.12)',color:sc2.type==='hook'?'#00c8ff':sc2.type==='cta'?'#ff6b35':'#7b2fff'}}>
-                        {sc2.type.toUpperCase()}
-                      </span>
+                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{background:sc2.type==='hook'?'rgba(0,200,255,0.12)':sc2.type==='cta'?'rgba(255,107,53,0.12)':'rgba(123,47,255,0.12)',color:sc2.type==='hook'?'#00c8ff':sc2.type==='cta'?'#ff6b35':'#7b2fff'}}>{sc2.type.toUpperCase()}</span>
                       <span className="text-xs text-white/25 flex-1">Scene {idx+1}</span>
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] text-white/20">⏱</span>
-                        <input type="number" min={2} max={30} value={sc2.durationSeconds}
-                          onChange={e=>setScenes(p=>p.map((s,i)=>i===idx?{...s,durationSeconds:Math.max(2,Math.min(30,+e.target.value))}:s))}
-                          className="w-10 bg-white/[0.07] border border-white/10 rounded-lg px-1.5 py-0.5 text-[10px] text-white text-center focus:outline-none"/>
+                        <input type="number" min={2} max={30} value={sc2.durationSeconds} onChange={e=>setScenes(p=>p.map((s,i)=>i===idx?{...s,durationSeconds:Math.max(2,Math.min(30,+e.target.value))}:s))} className="w-10 bg-white/[0.07] border border-white/10 rounded-lg px-1.5 py-0.5 text-[10px] text-white text-center focus:outline-none"/>
                         <span className="text-[10px] text-white/20">s</span>
                       </div>
                       <button onClick={()=>setScenes(p=>p.filter((_,i)=>i!==idx))} className="text-white/18 hover:text-red-400 text-xs transition-colors">✕</button>
@@ -416,8 +393,7 @@ export default function Dashboard(){
                       {(sc2.pexelsResults||[]).map((v,vi)=>{
                         const vk=idx+'-'+vi,act=sc2.mediaUrl===(v.bestUrl||v.thumbnail)
                         return(
-                          <div key={v.id+'-'+vi}
-                            onClick={()=>setScenes(p=>p.map((s,i)=>i===idx?{...s,mediaUrl:v.bestUrl||v.thumbnail,mediaType:v.type as 'video'|'image'}:s))}
+                          <div key={v.id+'-'+vi} onClick={()=>setScenes(p=>p.map((s,i)=>i===idx?{...s,mediaUrl:v.bestUrl||v.thumbnail,mediaType:v.type as 'video'|'image'}:s))}
                             onMouseEnter={()=>setHov(vk)} onMouseLeave={()=>setHov(null)}
                             className="relative shrink-0 cursor-pointer rounded-lg overflow-hidden transition-all duration-150"
                             style={{width:'54px',aspectRatio:'9/16',border:act?'2px solid #00c8ff':'2px solid rgba(255,255,255,0.07)',boxShadow:act?'0 0 10px rgba(0,200,255,0.25)':'none',transform:hov===vk?'scale(1.07)':'none'}}>
@@ -463,15 +439,10 @@ export default function Dashboard(){
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">Caption size</p>
-                  <div className="flex gap-2">{(['small','medium','large'] as const).map(s=><button key={s} onClick={()=>setCSize(s)} className="flex-1 py-2.5 rounded-xl text-sm capitalize font-semibold border transition-all" style={B(cSize===s)}>{s}</button>)}</div>
-                </div>
-                <div>
                   <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">Caption color</p>
                   <div className="flex items-center gap-2.5">
                     {['#ffffff','#ffff00','#00c8ff','#ff4488','#00ff88','#ff6b35'].map(c=>(
-                      <button key={c} onClick={()=>setCColor(c)} className="w-7 h-7 rounded-full transition-all"
-                        style={{background:c,border:cColor===c?'2.5px solid white':'2.5px solid transparent',boxShadow:cColor===c?'0 0 0 1.5px rgba(255,255,255,0.25)':'none'}}/>
+                      <button key={c} onClick={()=>setCColor(c)} className="w-7 h-7 rounded-full transition-all" style={{background:c,border:cColor===c?'2.5px solid white':'2.5px solid transparent',boxShadow:cColor===c?'0 0 0 1.5px rgba(255,255,255,0.25)':'none'}}/>
                     ))}
                     <input type="color" value={cColor} onChange={e=>setCColor(e.target.value)} className="w-7 h-7 rounded-full cursor-pointer bg-transparent border border-white/15"/>
                   </div>
@@ -495,129 +466,57 @@ export default function Dashboard(){
               <div className="space-y-6">
                 <div className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/[0.07] rounded-xl">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
-                      style={{background:'rgba(0,200,255,0.07)',border:'1px solid rgba(0,200,255,0.14)'}}>🎵</div>
-                    <div>
-                      <p className="text-sm font-semibold">Background Music</p>
-                      <p className="text-[10px] text-white/28 mt-0.5">Jamendo · royalty-free · loops to video length</p>
-                    </div>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{background:'rgba(0,200,255,0.07)',border:'1px solid rgba(0,200,255,0.14)'}}>🎵</div>
+                    <div><p className="text-sm font-semibold">Background Music</p><p className="text-[10px] text-white/28 mt-0.5">Jamendo · royalty-free · loops to video length</p></div>
                   </div>
-                  <button onClick={()=>setMusicOn(o=>!o)}
-                    className="w-11 h-6 rounded-full transition-all relative shrink-0"
-                    style={{background:musicOn?'#00c8ff':'rgba(255,255,255,0.1)'}}>
-                    <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200"
-                      style={{left:musicOn?'calc(100% - 22px)':'2px'}}/>
+                  <button onClick={()=>setMusicOn(o=>!o)} className="w-11 h-6 rounded-full transition-all relative shrink-0" style={{background:musicOn?'#00c8ff':'rgba(255,255,255,0.1)'}}>
+                    <div className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200" style={{left:musicOn?'calc(100% - 22px)':'2px'}}/>
                   </button>
                 </div>
                 {musicOn&&(
                   <div className="space-y-6">
                     <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-3">
-                      <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Volume</p>
-                        <span className="text-xs font-bold" style={{color:'#00c8ff'}}>{Math.round(musicVol*100)}%</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-base">🔈</span>
-                        <input type="range" min={0} max={0.6} step={0.01} value={musicVol}
-                          onChange={e=>{const v=+e.target.value;setMusicVol(v);if(musicRef.current)musicRef.current.volume=v}}
-                          className="flex-1" style={{accentColor:'#00c8ff'}}/>
-                        <span className="text-base">🔊</span>
-                      </div>
+                      <div className="flex justify-between items-center"><p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Volume</p><span className="text-xs font-bold" style={{color:'#00c8ff'}}>{Math.round(musicVol*100)}%</span></div>
+                      <div className="flex items-center gap-3"><span className="text-base">🔈</span><input type="range" min={0} max={0.6} step={0.01} value={musicVol} onChange={e=>{const v=+e.target.value;setMusicVol(v);if(musicRef.current)musicRef.current.volume=v}} className="flex-1" style={{accentColor:'#00c8ff'}}/><span className="text-base">🔊</span></div>
                       <p className="text-[10px] text-white/18">Keep at 15–25% so voiceover stays clear</p>
                     </div>
                     <div className="flex gap-2">
-                      <input value={musicSearch} onChange={e=>setMusicSearch(e.target.value)}
-                        onKeyDown={e=>{if(e.key==='Enter'&&musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}}
-                        placeholder="Search music… e.g. calm piano, epic drums"
-                        className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/18 focus:outline-none focus:border-white/22 transition-colors"/>
-                      <button onClick={()=>{if(musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}}
-                        className="px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0"
-                        style={{background:'rgba(0,200,255,0.1)',border:'1px solid rgba(0,200,255,0.2)',color:'#00c8ff'}}>
-                        Search
-                      </button>
+                      <input value={musicSearch} onChange={e=>setMusicSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}} placeholder="Search music… e.g. calm piano, epic drums" className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/18 focus:outline-none focus:border-white/22 transition-colors"/>
+                      <button onClick={()=>{if(musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}} className="px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0" style={{background:'rgba(0,200,255,0.1)',border:'1px solid rgba(0,200,255,0.2)',color:'#00c8ff'}}>Search</button>
                     </div>
                     <div>
                       <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">Genre</p>
                       <div className="grid grid-cols-4 gap-2">
-                        {[
-                          {id:'auto',label:'Auto',icon:'✨'},
-                          {id:'cinematic',label:'Cinematic',icon:'🎬'},
-                          {id:'upbeat',label:'Upbeat',icon:'⚡'},
-                          {id:'lofi',label:'Lo-Fi',icon:'☕'},
-                          {id:'dramatic',label:'Dramatic',icon:'🌩️'},
-                          {id:'inspirational',label:'Inspire',icon:'🌅'},
-                          {id:'dark',label:'Dark',icon:'🌑'},
-                          {id:'happy',label:'Happy',icon:'😊'},
-                        ].map(g=>{
+                        {[{id:'auto',label:'Auto',icon:'✨'},{id:'cinematic',label:'Cinematic',icon:'🎬'},{id:'upbeat',label:'Upbeat',icon:'⚡'},{id:'lofi',label:'Lo-Fi',icon:'☕'},{id:'dramatic',label:'Dramatic',icon:'🌩️'},{id:'inspirational',label:'Inspire',icon:'🌅'},{id:'dark',label:'Dark',icon:'🌑'},{id:'happy',label:'Happy',icon:'😊'}].map(g=>{
                           const active=musicGenre===g.id
-                          return(
-                            <button key={g.id}
-                              onClick={()=>{setMusicGenre(g.id);setMusicOffset(0);setMusicTracks([]);setMusicSearch('');fetchMusic(g.id,0)}}
-                              className="p-2.5 rounded-xl border transition-all text-center"
-                              style={{borderColor:active?'#00c8ff':'rgba(255,255,255,0.07)',background:active?'rgba(0,200,255,0.1)':'rgba(255,255,255,0.02)',color:active?'#00c8ff':'rgba(255,255,255,0.42)'}}>
-                              <div className="text-base mb-1">{g.icon}</div>
-                              <div className="text-[9px] font-semibold leading-tight">{g.label}</div>
-                            </button>
-                          )
+                          return(<button key={g.id} onClick={()=>{setMusicGenre(g.id);setMusicOffset(0);setMusicTracks([]);setMusicSearch('');fetchMusic(g.id,0)}} className="p-2.5 rounded-xl border transition-all text-center" style={{borderColor:active?'#00c8ff':'rgba(255,255,255,0.07)',background:active?'rgba(0,200,255,0.1)':'rgba(255,255,255,0.02)',color:active?'#00c8ff':'rgba(255,255,255,0.42)'}}><div className="text-base mb-1">{g.icon}</div><div className="text-[9px] font-semibold leading-tight">{g.label}</div></button>)
                         })}
                       </div>
                     </div>
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Tracks</p>
-                        {musicLoad&&<span className="text-[10px] text-white/20 animate-pulse">Loading…</span>}
-                      </div>
-                      {musicTracks.length===0&&!musicLoad&&(
-                        <div className="text-center py-8 text-white/20 text-xs">No tracks found — try another genre or search</div>
-                      )}
+                      <div className="flex items-center justify-between mb-3"><p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Tracks</p>{musicLoad&&<span className="text-[10px] text-white/20 animate-pulse">Loading…</span>}</div>
+                      {musicTracks.length===0&&!musicLoad&&<div className="text-center py-8 text-white/20 text-xs">No tracks found — try another genre or search</div>}
                       <div className="space-y-2">
                         {musicTracks.map(t=>{
                           const active=musicTrack?.id===t.id
-                          const mins=Math.floor(t.duration/60)
-                          const secs=String(t.duration%60).padStart(2,'0')
+                          const mins=Math.floor(t.duration/60),secs=String(t.duration%60).padStart(2,'0')
                           return(
-                            <div key={t.id}
-                              onClick={()=>{setMusicTrack(t);if(musicRef.current){musicRef.current.src=t.audio;musicRef.current.volume=musicVol;musicRef.current.play().then(()=>setMusicPlaying(true)).catch(()=>{})}}}
+                            <div key={t.id} onClick={()=>{setMusicTrack(t);if(musicRef.current){musicRef.current.src=t.audio;musicRef.current.volume=musicVol;musicRef.current.play().then(()=>setMusicPlaying(true)).catch(()=>{})}}}
                               className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-150"
                               style={{borderColor:active?'#00c8ff':'rgba(255,255,255,0.07)',background:active?'rgba(0,200,255,0.08)':'rgba(255,255,255,0.02)',transform:active?'translateY(-1px)':'none',boxShadow:active?'0 4px 16px rgba(0,200,255,0.12)':'none'}}>
-                              <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-white/[0.05] flex items-center justify-center" style={{border:'1px solid rgba(255,255,255,0.07)'}}>
-                                {t.image?<img src={t.image} alt="" className="w-full h-full object-cover"/>:<span className="text-base">🎵</span>}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-white/80 truncate">{t.title}</p>
-                                <p className="text-[10px] text-white/28 truncate">{t.artist} · {mins}:{secs}</p>
-                              </div>
-                              {active&&musicPlaying
-                                ?<div className="flex gap-px items-end shrink-0" style={{height:14}}>
-                                  {[3,5,7,4,6,5,3].map((h,i)=><div key={i} className="w-0.5 rounded-full animate-bounce" style={{height:h*1.8,background:'#00c8ff',animationDelay:i*80+'ms'}}/>)}
-                                </div>
-                                :active?<span className="text-[10px] font-bold shrink-0" style={{color:'#00c8ff'}}>✓</span>
-                                :<span className="text-[10px] text-white/18 shrink-0">▶</span>
-                              }
+                              <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-white/[0.05] flex items-center justify-center" style={{border:'1px solid rgba(255,255,255,0.07)'}}>{t.image?<img src={t.image} alt="" className="w-full h-full object-cover"/>:<span className="text-base">🎵</span>}</div>
+                              <div className="flex-1 min-w-0"><p className="text-xs font-semibold text-white/80 truncate">{t.title}</p><p className="text-[10px] text-white/28 truncate">{t.artist} · {mins}:{secs}</p></div>
+                              {active&&musicPlaying?<div className="flex gap-px items-end shrink-0" style={{height:14}}>{[3,5,7,4,6,5,3].map((h,i)=><div key={i} className="w-0.5 rounded-full animate-bounce" style={{height:h*1.8,background:'#00c8ff',animationDelay:i*80+'ms'}}/>)}</div>:active?<span className="text-[10px] font-bold shrink-0" style={{color:'#00c8ff'}}>✓</span>:<span className="text-[10px] text-white/18 shrink-0">▶</span>}
                             </div>
                           )
                         })}
                       </div>
-                      {musicTracks.length>0&&(
-                        <button onClick={()=>{const next=musicOffset+10;setMusicOffset(next);fetchMusic(musicGenre,next)}} disabled={musicLoad}
-                          className="w-full mt-3 py-2.5 rounded-xl border border-dashed border-white/08 text-xs text-white/25 hover:text-white/42 hover:border-white/14 transition-all disabled:opacity-30">
-                          {musicLoad?'Loading…':'Load more tracks'}
-                        </button>
-                      )}
+                      {musicTracks.length>0&&(<button onClick={()=>{const next=musicOffset+10;setMusicOffset(next);fetchMusic(musicGenre,next)}} disabled={musicLoad} className="w-full mt-3 py-2.5 rounded-xl border border-dashed border-white/08 text-xs text-white/25 hover:text-white/42 hover:border-white/14 transition-all disabled:opacity-30">{musicLoad?'Loading…':'Load more tracks'}</button>)}
                     </div>
-                    {musicPlaying&&(
-                      <button onClick={()=>{musicRef.current?.pause();setMusicPlaying(false)}}
-                        className="w-full py-2 rounded-xl border border-white/[0.07] text-xs text-white/35 hover:text-white/55 transition-all">
-                        ⏹ Stop preview
-                      </button>
-                    )}
-                    <audio ref={musicRef} loop preload="none"
-                      onPlay={()=>setMusicPlaying(true)}
-                      onPause={()=>setMusicPlaying(false)}
-                      onEnded={()=>setMusicPlaying(false)}/>
+                    {musicPlaying&&(<button onClick={()=>{musicRef.current?.pause();setMusicPlaying(false)}} className="w-full py-2 rounded-xl border border-white/[0.07] text-xs text-white/35 hover:text-white/55 transition-all">⏹ Stop preview</button>)}
+                    <audio ref={musicRef} loop preload="none" onPlay={()=>setMusicPlaying(true)} onPause={()=>setMusicPlaying(false)} onEnded={()=>setMusicPlaying(false)}/>
                     {musicTrack&&(
-                      <div className="flex items-center gap-2.5 p-3 rounded-xl border"
-                        style={{background:'rgba(0,200,255,0.05)',borderColor:'rgba(0,200,255,0.18)'}}>
+                      <div className="flex items-center gap-2.5 p-3 rounded-xl border" style={{background:'rgba(0,200,255,0.05)',borderColor:'rgba(0,200,255,0.18)'}}>
                         <span className="text-base">✅</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-white/55 truncate"><span className="text-white/80 font-semibold">{musicTrack.title}</span> by {musicTrack.artist}</p>
@@ -638,68 +537,39 @@ export default function Dashboard(){
           </div>
         )}
 
-        {/* STEP 3 — EXPORT */}
         {step===3&&(
           <div className="space-y-5">
-            <div>
-              <h1 className="text-[2rem] font-bold tracking-tight">Export</h1>
-              <p className="text-white/32 text-sm mt-1">Generate voice, then render your final MP4.</p>
-            </div>
+            <div><h1 className="text-[2rem] font-bold tracking-tight">Export</h1><p className="text-white/32 text-sm mt-1">Generate voice, then render your final MP4.</p></div>
             <div className="flex items-center gap-3 p-4 bg-white/[0.03] border border-white/[0.07] rounded-xl">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0" style={{background:'rgba(0,200,255,0.07)',border:'1px solid rgba(0,200,255,0.14)'}}>🎬</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white/80 truncate">{topic}</p>
-                <p className="text-[10px] text-white/28 mt-0.5">{scenes.length} scenes · {dur}s · {voice.name} · {STYLES.find(s=>s.id===style)?.label}</p>
-              </div>
+              <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-white/80 truncate">{topic}</p><p className="text-[10px] text-white/28 mt-0.5">{scenes.length} scenes · {dur}s · {voice.name} · {STYLES.find(s=>s.id===style)?.label}</p></div>
               <button onClick={()=>setStep(2)} className="text-[10px] text-white/25 hover:text-white/45 transition-colors shrink-0">Edit</button>
             </div>
-
-            {/* Voice */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div><p className="text-sm font-semibold">1 — Generate Voice</p><p className="text-[10px] text-white/28 mt-0.5">{voice.name} · ElevenLabs AI</p></div>
-                {aUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Ready</span>}
-              </div>
+              <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">1 — Generate Voice</p><p className="text-[10px] text-white/28 mt-0.5">{voice.name} · ElevenLabs AI</p></div>{aUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Ready</span>}</div>
               <div className="grid grid-cols-3 gap-4">
                 {[{label:'Stability',v:stab,set:setStab,c:'#00c8ff',min:0,max:1},{label:'Similarity',v:sim,set:setSim,c:'#7b2fff',min:0,max:1},{label:'Speed',v:spd,set:setSpd,c:'#00ff88',min:0.7,max:1.3}].map(x=>(
-                  <div key={x.label}>
-                    <div className="flex justify-between text-[10px] mb-1.5"><span className="text-white/28">{x.label}</span><span className="text-white/42">{x.v.toFixed(2)}</span></div>
-                    <input type="range" min={x.min} max={x.max} step={0.05} value={x.v} onChange={e=>x.set(+e.target.value)} className="w-full" style={{accentColor:x.c}}/>
-                  </div>
+                  <div key={x.label}><div className="flex justify-between text-[10px] mb-1.5"><span className="text-white/28">{x.label}</span><span className="text-white/42">{x.v.toFixed(2)}</span></div><input type="range" min={x.min} max={x.max} step={0.05} value={x.v} onChange={e=>x.set(+e.target.value)} className="w-full" style={{accentColor:x.c}}/></div>
                 ))}
               </div>
               {aUrl&&<audio src={aUrl} controls className="w-full h-8 rounded-lg"/>}
               {aErr&&<p className="text-xs text-red-400">{aErr}</p>}
-              <button onClick={genVoice} disabled={aLoad||!script}
-                className="w-full py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-35 border"
-                style={{borderColor:aUrl?'rgba(0,255,136,0.22)':'rgba(255,255,255,0.09)',color:aUrl?'#00ff88':'rgba(255,255,255,0.55)'}}>
+              <button onClick={genVoice} disabled={aLoad||!script} className="w-full py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-35 border" style={{borderColor:aUrl?'rgba(0,255,136,0.22)':'rgba(255,255,255,0.09)',color:aUrl?'#00ff88':'rgba(255,255,255,0.55)'}}>
                 {aLoad?'⏳ Generating…':aUrl?'🔄 Regenerate Voice':'🎙️ Generate Voice'}
               </button>
             </div>
-
-            {/* Render */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div><p className="text-sm font-semibold">2 — Render Video</p><p className="text-[10px] text-white/28 mt-0.5">1080×1920 · H.264 MP4</p></div>
-                {rUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Done</span>}
-              </div>
-
-              {/* Method tabs */}
+              <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">2 — Render Video</p><p className="text-[10px] text-white/28 mt-0.5">1080×1920 · H.264 MP4</p></div>{rUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Done</span>}</div>
               <div className="flex gap-0.5 p-1 bg-white/[0.04] border border-white/[0.05] rounded-xl w-fit">
                 {(['browser','shotstack'] as const).map(m=>(
-                  <button key={m} onClick={()=>{setRenderMethod(m);setRUrl(null);setRErr('')}}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                    style={{background:renderMethod===m?'rgba(255,255,255,0.09)':'transparent',color:renderMethod===m?'white':'rgba(255,255,255,0.32)'}}>
+                  <button key={m} onClick={()=>{setRenderMethod(m);setRUrl(null);setRErr('')}} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all" style={{background:renderMethod===m?'rgba(255,255,255,0.09)':'transparent',color:renderMethod===m?'white':'rgba(255,255,255,0.32)'}}>
                     {m==='browser'?'🖥 Browser (Free)':'☁️ Shotstack'}
                   </button>
                 ))}
               </div>
-
               {renderMethod==='browser'&&(
                 <div className="space-y-3">
-                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl">
-                    <p className="text-[10px] text-white/35">✅ Runs entirely in your browser · No AWS · No cost · Uses your device CPU</p>
-                  </div>
+                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl"><p className="text-[10px] text-white/35">✅ Runs entirely in your browser · No AWS · No cost · Uses your device CPU</p></div>
                   <VideoRenderer
                     scenes={scenes}
                     audioUrl={aUrl}
@@ -707,55 +577,29 @@ export default function Dashboard(){
                     musicVolume={musicVol}
                     captionColor={cColor}
                     topic={topic}
-                    onComplete={(url)=>{setRUrl(url);setRErr('')}}
-                    onError={(err)=>{setRErr(err)}}
+                    onComplete={(url: string)=>{setRUrl(url);setRErr('')}}
+                    onError={(err: string)=>{setRErr(err)}}
                   />
                   {rErr&&<p className="text-xs text-red-400 mt-2">{rErr} — try Shotstack tab instead</p>}
                 </div>
               )}
-
               {renderMethod==='shotstack'&&(
                 <div className="space-y-3">
-                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl">
-                    <p className="text-[10px] text-white/35">☁️ Cloud rendering · 10 free credits · Get key at <a href="https://shotstack.io" target="_blank" rel="noopener" className="text-[#00c8ff] underline">shotstack.io</a></p>
-                  </div>
-                  {rLoad&&(
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs"><span className="text-white/38">{rStat}</span><span className="text-white font-semibold">{rPct}%</span></div>
-                      <div className="w-full bg-white/[0.07] rounded-full h-1 overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{width:rPct+'%',background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/>
-                      </div>
-                    </div>
-                  )}
+                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl"><p className="text-[10px] text-white/35">☁️ Cloud rendering · 10 free credits · Get key at <a href="https://shotstack.io" target="_blank" rel="noopener" className="text-[#00c8ff] underline">shotstack.io</a></p></div>
+                  {rLoad&&(<div className="space-y-2"><div className="flex justify-between text-xs"><span className="text-white/38">{rStat}</span><span className="text-white font-semibold">{rPct}%</span></div><div className="w-full bg-white/[0.07] rounded-full h-1 overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{width:rPct+'%',background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/></div></div>)}
                   {rErr&&!rLoad&&<p className="text-xs text-red-400">{rErr}</p>}
-                  {!rLoad&&(
-                    <button onClick={renderShotstack}
-                      className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
-                      style={{background:'linear-gradient(135deg,#7b2fff,#ff6b35)'}}>
-                      🚀 {rUrl?'Re-render':'Render via Shotstack'}
-                    </button>
-                  )}
+                  {!rLoad&&(<button onClick={renderShotstack} className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all" style={{background:'linear-gradient(135deg,#7b2fff,#ff6b35)'}}>🚀 {rUrl?'Re-render':'Render via Shotstack'}</button>)}
                 </div>
               )}
-
               {rUrl&&(
                 <div className="space-y-2.5 pt-2">
                   <video src={rUrl} controls className="w-full rounded-xl" style={{maxHeight:300}}/>
-                  <a href={rUrl} download="clipforge-short.mp4"
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold"
-                    style={{background:'rgba(0,255,136,0.07)',border:'1px solid rgba(0,255,136,0.18)',color:'#00ff88'}}>
-                    ⬇️ Download MP4
-                  </a>
+                  <a href={rUrl} download="clipforge-short.mp4" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold" style={{background:'rgba(0,255,136,0.07)',border:'1px solid rgba(0,255,136,0.18)',color:'#00ff88'}}>⬇️ Download MP4</a>
                   {musicTrack&&(
                     <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-2">
                       <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">📋 YouTube Attribution — copy this</p>
-                      <div className="bg-black/30 rounded-lg p-3">
-                        <p className="text-[11px] text-white/55 leading-5 whitespace-pre-line select-all">{`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`}</p>
-                      </div>
-                      <button onClick={()=>navigator.clipboard.writeText(`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`)}
-                        className="w-full py-2 rounded-lg text-xs border border-white/[0.07] text-white/35 hover:text-white/55 transition-all">
-                        📋 Copy attribution text
-                      </button>
+                      <div className="bg-black/30 rounded-lg p-3"><p className="text-[11px] text-white/55 leading-5 whitespace-pre-line select-all">{`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`}</p></div>
+                      <button onClick={()=>navigator.clipboard.writeText(`🎵 Music: ${musicTrack.title} by ${musicTrack.artist}\nLicensed under Creative Commons\n${musicTrack.license}`)} className="w-full py-2 rounded-lg text-xs border border-white/[0.07] text-white/35 hover:text-white/55 transition-all">📋 Copy attribution text</button>
                     </div>
                   )}
                 </div>
