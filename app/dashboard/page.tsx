@@ -1,5 +1,8 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import dynamic from 'next/dynamic'
+
+const VideoRenderer = dynamic(() => import('@/components/VideoRenderer'), { ssr: false })
 
 interface Scene { id:number; text:string; searchQuery:string; type:'hook'|'story'|'cta'; durationSeconds:number; mediaUrl?:string; mediaType:'video'|'image'; pexelsResults?:PV[] }
 interface PV { id:number; thumbnail:string; bestUrl:string; duration:number; photographer:string; type:'video'|'image' }
@@ -65,9 +68,8 @@ export default function Dashboard(){
   const [rStat,setRStat]=useState('')
   const [rUrl,setRUrl]=useState<string|null>(null)
   const [rErr,setRErr]=useState('')
-  const [lSetup,setLSetup]=useState(false)
-  const [lVars,setLVars]=useState<string[]>([])
   const [hov,setHov]=useState<string|null>(null)
+  const [renderMethod,setRenderMethod]=useState<'browser'|'shotstack'>('browser')
   const [musicOn,setMusicOn]=useState(true)
   const [musicVol,setMusicVol]=useState(0.18)
   const [musicGenre,setMusicGenre]=useState('auto')
@@ -182,28 +184,29 @@ export default function Dashboard(){
     setALoad(false)
   }
 
-  async function render(){
-    setRLoad(true);setRErr('');setRUrl(null);setRPct(5);setRStat('Starting...');setLSetup(false)
+  async function renderShotstack(){
+    setRLoad(true);setRErr('');setRUrl(null);setRPct(5);setRStat('Submitting to Shotstack…')
     try{
-      const r=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      const r=await fetch('/api/render-shotstack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         scenes:scenes.map(s=>({id:s.id,text:s.text,mediaUrl:s.mediaUrl||'',mediaType:s.mediaType,type:s.type,durationSeconds:s.durationSeconds})),
-        audioUrl:aUrl||'',captionStyle:cStyle,captionColor:cColor,captionSize:cSize,brandColor:bColor,title:topic,
+        audioUrl:aUrl||'',
         musicUrl:musicOn&&musicTrack?musicTrack.audio:'',
         musicVolume:musicVol,
+        captionColor:cColor,
+        title:topic,
       })})
       const d=await r.json()
-      if(d.setupRequired){setLSetup(true);setLVars(d.missingVars||[]);setRLoad(false);return}
-      if(!r.ok)throw new Error(d.error||'Render failed')
-      const{renderId,bucketName,region}=d;setRPct(10);setRStat('Queued on Lambda...')
-      for(let i=0;i<120;i++){
-        await new Promise(x=>setTimeout(x,2000))
-        const p=await fetch(`/api/render?renderId=${renderId}&bucketName=${bucketName}&region=${region}`).then(x=>x.json())
-        if(p.fatalErrorEncountered)throw new Error(p.errors?.[0]?.message||'Lambda error')
-        const pct=Math.min(Math.round((p.overallProgress||0)*85)+10,98);setRPct(pct)
-        setRStat(pct<35?'Compositing..':pct<65?'Encoding..':pct<90?'Adding audio..':'Finalising..')
+      if(!r.ok)throw new Error(d.error||'Shotstack submission failed')
+      const{renderId}=d;setRPct(15);setRStat('Rendering in cloud…')
+      for(let i=0;i<60;i++){
+        await new Promise(x=>setTimeout(x,3000))
+        const p=await fetch(`/api/render-shotstack?renderId=${renderId}`).then(x=>x.json())
+        if(p.failed)throw new Error('Shotstack render failed — check your API key and credits')
+        const pct=Math.min(15+i*2,95);setRPct(pct)
+        setRStat(pct<40?'Processing scenes…':pct<70?'Encoding video…':'Finalising…')
         if(p.done&&p.outputFile){setRUrl(p.outputFile);setRPct(100);setRStat('Done!');break}
       }
-    }catch(e:any){setRErr(e.message||'Render failed.')}
+    }catch(e:any){setRErr(e.message||'Shotstack render failed.')}
     setRLoad(false)
   }
 
@@ -506,11 +509,8 @@ export default function Dashboard(){
                       style={{left:musicOn?'calc(100% - 22px)':'2px'}}/>
                   </button>
                 </div>
-
                 {musicOn&&(
                   <div className="space-y-6">
-
-                    {/* Volume */}
                     <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-3">
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Volume</p>
@@ -525,24 +525,17 @@ export default function Dashboard(){
                       </div>
                       <p className="text-[10px] text-white/18">Keep at 15–25% so voiceover stays clear</p>
                     </div>
-
-                    {/* Search */}
                     <div className="flex gap-2">
-                      <input
-                        value={musicSearch}
-                        onChange={e=>setMusicSearch(e.target.value)}
+                      <input value={musicSearch} onChange={e=>setMusicSearch(e.target.value)}
                         onKeyDown={e=>{if(e.key==='Enter'&&musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}}
                         placeholder="Search music… e.g. calm piano, epic drums"
                         className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/18 focus:outline-none focus:border-white/22 transition-colors"/>
-                      <button
-                        onClick={()=>{if(musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}}
+                      <button onClick={()=>{if(musicSearch.trim()){setMusicOffset(0);setMusicTracks([]);fetchMusicBySearch(musicSearch)}}}
                         className="px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0"
                         style={{background:'rgba(0,200,255,0.1)',border:'1px solid rgba(0,200,255,0.2)',color:'#00c8ff'}}>
                         Search
                       </button>
                     </div>
-
-                    {/* Genre */}
                     <div>
                       <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-3">Genre</p>
                       <div className="grid grid-cols-4 gap-2">
@@ -569,8 +562,6 @@ export default function Dashboard(){
                         })}
                       </div>
                     </div>
-
-                    {/* Tracks */}
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-[10px] font-semibold text-white/25 uppercase tracking-widest">Tracks</p>
@@ -586,10 +577,7 @@ export default function Dashboard(){
                           const secs=String(t.duration%60).padStart(2,'0')
                           return(
                             <div key={t.id}
-                              onClick={()=>{
-                                setMusicTrack(t)
-                                if(musicRef.current){musicRef.current.src=t.audio;musicRef.current.volume=musicVol;musicRef.current.play().then(()=>setMusicPlaying(true)).catch(()=>{})}
-                              }}
+                              onClick={()=>{setMusicTrack(t);if(musicRef.current){musicRef.current.src=t.audio;musicRef.current.volume=musicVol;musicRef.current.play().then(()=>setMusicPlaying(true)).catch(()=>{})}}}
                               className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-150"
                               style={{borderColor:active?'#00c8ff':'rgba(255,255,255,0.07)',background:active?'rgba(0,200,255,0.08)':'rgba(255,255,255,0.02)',transform:active?'translateY(-1px)':'none',boxShadow:active?'0 4px 16px rgba(0,200,255,0.12)':'none'}}>
                               <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-white/[0.05] flex items-center justify-center" style={{border:'1px solid rgba(255,255,255,0.07)'}}>
@@ -603,9 +591,8 @@ export default function Dashboard(){
                                 ?<div className="flex gap-px items-end shrink-0" style={{height:14}}>
                                   {[3,5,7,4,6,5,3].map((h,i)=><div key={i} className="w-0.5 rounded-full animate-bounce" style={{height:h*1.8,background:'#00c8ff',animationDelay:i*80+'ms'}}/>)}
                                 </div>
-                                :active
-                                  ?<span className="text-[10px] font-bold shrink-0" style={{color:'#00c8ff'}}>✓</span>
-                                  :<span className="text-[10px] text-white/18 shrink-0">▶</span>
+                                :active?<span className="text-[10px] font-bold shrink-0" style={{color:'#00c8ff'}}>✓</span>
+                                :<span className="text-[10px] text-white/18 shrink-0">▶</span>
                               }
                             </div>
                           )
@@ -618,27 +605,22 @@ export default function Dashboard(){
                         </button>
                       )}
                     </div>
-
                     {musicPlaying&&(
                       <button onClick={()=>{musicRef.current?.pause();setMusicPlaying(false)}}
                         className="w-full py-2 rounded-xl border border-white/[0.07] text-xs text-white/35 hover:text-white/55 transition-all">
                         ⏹ Stop preview
                       </button>
                     )}
-
                     <audio ref={musicRef} loop preload="none"
                       onPlay={()=>setMusicPlaying(true)}
                       onPause={()=>setMusicPlaying(false)}
                       onEnded={()=>setMusicPlaying(false)}/>
-
                     {musicTrack&&(
                       <div className="flex items-center gap-2.5 p-3 rounded-xl border"
                         style={{background:'rgba(0,200,255,0.05)',borderColor:'rgba(0,200,255,0.18)'}}>
                         <span className="text-base">✅</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-white/55 truncate">
-                            <span className="text-white/80 font-semibold">{musicTrack.title}</span> by {musicTrack.artist}
-                          </p>
+                          <p className="text-xs text-white/55 truncate"><span className="text-white/80 font-semibold">{musicTrack.title}</span> by {musicTrack.artist}</p>
                           <p className="text-[10px] text-white/28 mt-0.5">Mixed at {Math.round(musicVol*100)}% · loops to fill {dur}s</p>
                           <p className="text-[10px] mt-1" style={{color:'#00c8ff88'}}>⚠️ Required for YouTube → <a href={musicTrack.license} target="_blank" rel="noopener" className="underline ml-1" style={{color:'#00c8ff'}}>CC License</a></p>
                         </div>
@@ -671,6 +653,8 @@ export default function Dashboard(){
               </div>
               <button onClick={()=>setStep(2)} className="text-[10px] text-white/25 hover:text-white/45 transition-colors shrink-0">Edit</button>
             </div>
+
+            {/* Voice */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div><p className="text-sm font-semibold">1 — Generate Voice</p><p className="text-[10px] text-white/28 mt-0.5">{voice.name} · ElevenLabs AI</p></div>
@@ -692,30 +676,71 @@ export default function Dashboard(){
                 {aLoad?'⏳ Generating…':aUrl?'🔄 Regenerate Voice':'🎙️ Generate Voice'}
               </button>
             </div>
+
+            {/* Render */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <div><p className="text-sm font-semibold">2 — Render Video</p><p className="text-[10px] text-white/28 mt-0.5">1080×1920 · H.264 MP4 · AWS Lambda</p></div>
+                <div><p className="text-sm font-semibold">2 — Render Video</p><p className="text-[10px] text-white/28 mt-0.5">1080×1920 · H.264 MP4</p></div>
                 {rUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Done</span>}
               </div>
-              {lSetup&&(
-                <div className="bg-amber-500/[0.07] border border-amber-500/18 rounded-xl p-4 space-y-3">
-                  <p className="text-xs font-semibold text-amber-400">⚙️ AWS Lambda setup needed</p>
-                  <div className="space-y-1.5">{lVars.map(v=><div key={v} className="flex items-center gap-2"><span className="text-red-400 text-xs">✗</span><code className="text-[10px] text-red-300 font-mono">{v}</code></div>)}</div>
-                  <a href="https://www.remotion.dev/docs/lambda/setup" target="_blank" rel="noopener" className="text-[10px] text-[#00c8ff] hover:underline block">View setup guide →</a>
-                </div>
-              )}
-              {rLoad&&(
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs"><span className="text-white/38">{rStat}</span><span className="text-white font-semibold">{rPct}%</span></div>
-                  <div className="w-full bg-white/[0.07] rounded-full h-1 overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500" style={{width:rPct+'%',background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/>
+
+              {/* Method tabs */}
+              <div className="flex gap-0.5 p-1 bg-white/[0.04] border border-white/[0.05] rounded-xl w-fit">
+                {(['browser','shotstack'] as const).map(m=>(
+                  <button key={m} onClick={()=>{setRenderMethod(m);setRUrl(null);setRErr('')}}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={{background:renderMethod===m?'rgba(255,255,255,0.09)':'transparent',color:renderMethod===m?'white':'rgba(255,255,255,0.32)'}}>
+                    {m==='browser'?'🖥 Browser (Free)':'☁️ Shotstack'}
+                  </button>
+                ))}
+              </div>
+
+              {renderMethod==='browser'&&(
+                <div className="space-y-3">
+                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                    <p className="text-[10px] text-white/35">✅ Runs entirely in your browser · No AWS · No cost · Uses your device CPU</p>
                   </div>
+                  <VideoRenderer
+                    scenes={scenes}
+                    audioUrl={aUrl}
+                    musicUrl={musicOn&&musicTrack?musicTrack.audio:null}
+                    musicVolume={musicVol}
+                    captionColor={cColor}
+                    topic={topic}
+                    onComplete={(url)=>{setRUrl(url);setRErr('')}}
+                    onError={(err)=>{setRErr(err)}}
+                  />
+                  {rErr&&<p className="text-xs text-red-400 mt-2">{rErr} — try Shotstack tab instead</p>}
                 </div>
               )}
-              {rErr&&!lSetup&&<p className="text-xs text-red-400">{rErr}</p>}
+
+              {renderMethod==='shotstack'&&(
+                <div className="space-y-3">
+                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                    <p className="text-[10px] text-white/35">☁️ Cloud rendering · 10 free credits · Get key at <a href="https://shotstack.io" target="_blank" rel="noopener" className="text-[#00c8ff] underline">shotstack.io</a></p>
+                  </div>
+                  {rLoad&&(
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs"><span className="text-white/38">{rStat}</span><span className="text-white font-semibold">{rPct}%</span></div>
+                      <div className="w-full bg-white/[0.07] rounded-full h-1 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{width:rPct+'%',background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/>
+                      </div>
+                    </div>
+                  )}
+                  {rErr&&!rLoad&&<p className="text-xs text-red-400">{rErr}</p>}
+                  {!rLoad&&(
+                    <button onClick={renderShotstack}
+                      className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
+                      style={{background:'linear-gradient(135deg,#7b2fff,#ff6b35)'}}>
+                      🚀 {rUrl?'Re-render':'Render via Shotstack'}
+                    </button>
+                  )}
+                </div>
+              )}
+
               {rUrl&&(
-                <div className="space-y-2.5">
-                  <video src={rUrl} controls className="w-full rounded-xl" style={{maxHeight:260}}/>
+                <div className="space-y-2.5 pt-2">
+                  <video src={rUrl} controls className="w-full rounded-xl" style={{maxHeight:300}}/>
                   <a href={rUrl} download="clipforge-short.mp4"
                     className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold"
                     style={{background:'rgba(0,255,136,0.07)',border:'1px solid rgba(0,255,136,0.18)',color:'#00ff88'}}>
@@ -734,11 +759,6 @@ export default function Dashboard(){
                     </div>
                   )}
                 </div>
-              )}
-              {!rLoad&&!lSetup&&(
-                <button onClick={render} className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all" style={{background:'linear-gradient(135deg,#7b2fff,#ff6b35)'}}>
-                  🚀 {rUrl?'Re-render':'Render Video'}
-                </button>
               )}
             </div>
             <button onClick={()=>setStep(2)} className="text-[10px] text-white/20 hover:text-white/38 transition-colors">← Back to script</button>
