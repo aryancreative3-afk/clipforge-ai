@@ -397,7 +397,14 @@ export default function Dashboard(){
                             onMouseEnter={()=>setHov(vk)} onMouseLeave={()=>setHov(null)}
                             className="relative shrink-0 cursor-pointer rounded-lg overflow-hidden transition-all duration-150"
                             style={{width:'54px',aspectRatio:'9/16',border:act?'2px solid #00c8ff':'2px solid rgba(255,255,255,0.07)',boxShadow:act?'0 0 10px rgba(0,200,255,0.25)':'none',transform:hov===vk?'scale(1.07)':'none'}}>
-                            <img src={v.thumbnail} alt="" className="w-full h-full object-cover"/>
+                            <img 
+  src={v.thumbnail} 
+  alt="" 
+  className="w-full h-full object-cover"
+  onError={(e)=>{(e.target as HTMLImageElement).style.display='none'}}
+  onLoad={(e)=>{(e.target as HTMLImageElement).style.opacity='1'}}
+  style={{opacity:0,transition:'opacity 0.3s'}}
+/>
                             {hov===vk&&v.bestUrl&&<video src={v.bestUrl} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline/>}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"/>
                             {act&&<div className="absolute top-1 left-1/2 -translate-x-1/2 bg-[#00c8ff] text-black text-[7px] font-black px-1 py-px rounded-full">✓</div>}
