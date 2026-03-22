@@ -15,11 +15,17 @@ export async function POST(req: NextRequest) {
     const duration = scene.durationSeconds || 5
 
     // Video clip
-    if (scene.mediaUrl) {
-      videoClips.push({
-        asset: {
-          type: scene.mediaType === 'image' ? 'image' : 'video',
-          src: scene.mediaUrl,
+ if (scene.mediaUrl) {
+// For Shotstack, use thumbnail image instead of video (videos need CDN hosting)
+const isVideo = scene.mediaType === 'video'
+const shotstackUrl = isVideo
+  ? scene.mediaUrl.replace('videos.pexels.com/video-files', 'images.pexels.com/videos').replace(/\/[^/]+\.mp4.*$/, '/pictures/preview.jpg')
+  : scene.mediaUrl
+
+videoClips.push({
+  asset: {
+    type: 'image',
+    src: scene.mediaUrl,
           ...(scene.mediaType === 'video' ? { trim: 0, volume: 0 } : {}),
         },
         start: currentTime,

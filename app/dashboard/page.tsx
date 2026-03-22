@@ -2,7 +2,6 @@
 import { useState, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 
-// FIX: import from app/components not @/components
 const VideoRenderer = dynamic(
   () => import('@/app/components/VideoRenderer'),
   {
@@ -40,6 +39,19 @@ const STYLES=[
 const STEPS=['Topic','Style & Voice','Script','Export']
 const EXAMPLES=['Why the moon turns red in a lunar eclipse','The truth about why we dream','How black holes actually work','Why Japan has almost zero crime','What happens 1 second after you die','The secret life of trees']
 
+// Detect if device supports FFmpeg.wasm (needs SharedArrayBuffer)
+function canUseBrowserRender(): boolean {
+  if (typeof window === 'undefined') return false
+  // iOS Safari and some Android browsers don't support SharedArrayBuffer
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  const isAndroid = /Android/.test(navigator.userAgent)
+  // Check if SharedArrayBuffer is available
+  const hasSharedArrayBuffer = typeof SharedArrayBuffer !== 'undefined'
+  if (isIOS) return false
+  if (isAndroid && !hasSharedArrayBuffer) return false
+  return hasSharedArrayBuffer
+}
+
 async function post(url:string,body:object){
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
   const d=await r.json().catch(()=>({}))
@@ -50,7 +62,7 @@ async function post(url:string,body:object){
 export default function Dashboard(){
   const [step,setStep]=useState(0)
   const [topic,setTopic]=useState('')
-  const [dur,setDur]=useState<'30'|'45'|'60'>('60')
+  const [dur,setDur]=useState<'30'|'45'|'60'>('30')
   const [style,setStyle]=useState('viral')
   const [voice,setVoice]=useState<Voice>(VOICES[0])
   const [prevId,setPrevId]=useState<string|null>(null)
@@ -79,7 +91,7 @@ export default function Dashboard(){
   const [rUrl,setRUrl]=useState<string|null>(null)
   const [rErr,setRErr]=useState('')
   const [hov,setHov]=useState<string|null>(null)
-  const [renderMethod,setRenderMethod]=useState<'browser'|'shotstack'>('browser')
+  const [isMobile,setIsMobile]=useState(false)
   const [musicOn,setMusicOn]=useState(true)
   const [musicVol,setMusicVol]=useState(0.18)
   const [musicGenre,setMusicGenre]=useState('auto')
@@ -94,6 +106,10 @@ export default function Dashboard(){
 
   useEffect(()=>{if(step===0)tRef.current?.focus()},[step])
   useEffect(()=>{if(step===2)fetchMusic(musicGenre,0)},[step])
+  useEffect(()=>{
+    // Detect mobile on client side
+    setIsMobile(!canUseBrowserRender())
+  },[])
 
   function startPrev(v:Voice){
     if(prevId===v.id){stopPrev();return}
@@ -195,24 +211,24 @@ export default function Dashboard(){
   }
 
   async function renderShotstack(){
-    setRLoad(true);setRErr('');setRUrl(null);setRPct(5);setRStat('Submitting to Shotstack…')
+    setRLoad(true);setRErr('');setRUrl(null);setRPct(5);setRStat('Submitting…')
     try{
       const r=await fetch('/api/render-shotstack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         scenes:scenes.map(s=>({id:s.id,text:s.text,mediaUrl:s.mediaUrl||'',mediaType:s.mediaType,type:s.type,durationSeconds:s.durationSeconds})),
         audioUrl:aUrl||'',musicUrl:musicOn&&musicTrack?musicTrack.audio:'',musicVolume:musicVol,captionColor:cColor,title:topic,
       })})
       const d=await r.json()
-      if(!r.ok)throw new Error(d.error||'Shotstack submission failed')
+      if(!r.ok)throw new Error(d.error||'Submission failed')
       const{renderId}=d;setRPct(15);setRStat('Rendering in cloud…')
       for(let i=0;i<60;i++){
         await new Promise(x=>setTimeout(x,3000))
         const p=await fetch(`/api/render-shotstack?renderId=${renderId}`).then(x=>x.json())
-        if(p.failed)throw new Error('Shotstack render failed — check your API key and credits')
+        if(p.failed)throw new Error('Render failed — check API key and credits')
         const pct=Math.min(15+i*2,95);setRPct(pct)
         setRStat(pct<40?'Processing scenes…':pct<70?'Encoding video…':'Finalising…')
         if(p.done&&p.outputFile){setRUrl(p.outputFile);setRPct(100);setRStat('Done!');break}
       }
-    }catch(e:any){setRErr(e.message||'Shotstack render failed.')}
+    }catch(e:any){setRErr(e.message||'Render failed.')}
     setRLoad(false)
   }
 
@@ -251,6 +267,7 @@ export default function Dashboard(){
 
       <main className="max-w-2xl mx-auto px-5 py-14">
 
+        {/* STEP 0 — TOPIC */}
         {step===0&&(
           <div className="space-y-9">
             <div>
@@ -284,6 +301,7 @@ export default function Dashboard(){
           </div>
         )}
 
+        {/* STEP 1 — STYLE & VOICE */}
         {step===1&&(
           <div className="space-y-9">
             <div>
@@ -345,6 +363,7 @@ export default function Dashboard(){
           </div>
         )}
 
+        {/* STEP 2 — SCRIPT */}
         {step===2&&(
           <div className="space-y-5">
             <div className="flex items-start justify-between">
@@ -397,14 +416,10 @@ export default function Dashboard(){
                             onMouseEnter={()=>setHov(vk)} onMouseLeave={()=>setHov(null)}
                             className="relative shrink-0 cursor-pointer rounded-lg overflow-hidden transition-all duration-150"
                             style={{width:'54px',aspectRatio:'9/16',border:act?'2px solid #00c8ff':'2px solid rgba(255,255,255,0.07)',boxShadow:act?'0 0 10px rgba(0,200,255,0.25)':'none',transform:hov===vk?'scale(1.07)':'none'}}>
-                            <img 
-  src={v.thumbnail} 
-  alt="" 
-  className="w-full h-full object-cover"
-  onError={(e)=>{(e.target as HTMLImageElement).style.display='none'}}
-  onLoad={(e)=>{(e.target as HTMLImageElement).style.opacity='1'}}
-  style={{opacity:0,transition:'opacity 0.3s'}}
-/>
+                            <img src={v.thumbnail} alt="" className="w-full h-full object-cover"
+                              onError={(e)=>{(e.target as HTMLImageElement).style.display='none'}}
+                              onLoad={(e)=>{(e.target as HTMLImageElement).style.opacity='1'}}
+                              style={{opacity:0,transition:'opacity 0.3s'}}/>
                             {hov===vk&&v.bestUrl&&<video src={v.bestUrl} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline/>}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"/>
                             {act&&<div className="absolute top-1 left-1/2 -translate-x-1/2 bg-[#00c8ff] text-black text-[7px] font-black px-1 py-px rounded-full">✓</div>}
@@ -544,6 +559,7 @@ export default function Dashboard(){
           </div>
         )}
 
+        {/* STEP 3 — EXPORT */}
         {step===3&&(
           <div className="space-y-5">
             <div><h1 className="text-[2rem] font-bold tracking-tight">Export</h1><p className="text-white/32 text-sm mt-1">Generate voice, then render your final MP4.</p></div>
@@ -552,6 +568,8 @@ export default function Dashboard(){
               <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-white/80 truncate">{topic}</p><p className="text-[10px] text-white/28 mt-0.5">{scenes.length} scenes · {dur}s · {voice.name} · {STYLES.find(s=>s.id===style)?.label}</p></div>
               <button onClick={()=>setStep(2)} className="text-[10px] text-white/25 hover:text-white/45 transition-colors shrink-0">Edit</button>
             </div>
+
+            {/* Voice */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-5 space-y-4">
               <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">1 — Generate Voice</p><p className="text-[10px] text-white/28 mt-0.5">{voice.name} · ElevenLabs AI</p></div>{aUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Ready</span>}</div>
               <div className="grid grid-cols-3 gap-4">
@@ -565,18 +583,27 @@ export default function Dashboard(){
                 {aLoad?'⏳ Generating…':aUrl?'🔄 Regenerate Voice':'🎙️ Generate Voice'}
               </button>
             </div>
+
+            {/* Render */}
             <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">2 — Render Video</p><p className="text-[10px] text-white/28 mt-0.5">1080×1920 · H.264 MP4</p></div>{rUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Done</span>}</div>
-              <div className="flex gap-0.5 p-1 bg-white/[0.04] border border-white/[0.05] rounded-xl w-fit">
-                {(['browser','shotstack'] as const).map(m=>(
-                  <button key={m} onClick={()=>{setRenderMethod(m);setRUrl(null);setRErr('')}} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all" style={{background:renderMethod===m?'rgba(255,255,255,0.09)':'transparent',color:renderMethod===m?'white':'rgba(255,255,255,0.32)'}}>
-                    {m==='browser'?'🖥 Browser (Free)':'☁️ Shotstack'}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between">
+                <div><p className="text-sm font-semibold">2 — Render Video</p><p className="text-[10px] text-white/28 mt-0.5">1080×1920 · H.264 MP4</p></div>
+                {rUrl&&<span className="text-[10px] text-green-400 font-semibold">✓ Done</span>}
               </div>
-              {renderMethod==='browser'&&(
+
+              {/* Device info badge */}
+              <div className="flex items-center gap-2 p-2.5 bg-white/[0.02] border border-white/[0.05] rounded-lg">
+                <span className="text-sm">{isMobile?'📱':'🖥'}</span>
+                <p className="text-[10px] text-white/35">
+                  {isMobile
+                    ? 'Mobile detected — using cloud render (Shotstack)'
+                    : 'Desktop detected — rendering locally in your browser (free, no upload needed)'}
+                </p>
+              </div>
+
+              {/* Desktop: Browser FFmpeg */}
+              {!isMobile&&(
                 <div className="space-y-3">
-                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl"><p className="text-[10px] text-white/35">✅ Runs entirely in your browser · No AWS · No cost · Uses your device CPU</p></div>
                   <VideoRenderer
                     scenes={scenes}
                     audioUrl={aUrl}
@@ -584,20 +611,45 @@ export default function Dashboard(){
                     musicVolume={musicVol}
                     captionColor={cColor}
                     topic={topic}
-                    onComplete={(url: string)=>{setRUrl(url);setRErr('')}}
-                    onError={(err: string)=>{setRErr(err)}}
+                    onComplete={(url:string)=>{setRUrl(url);setRErr('')}}
+                    onError={(err:string)=>{setRErr(err)}}
                   />
-                  {rErr&&<p className="text-xs text-red-400 mt-2">{rErr} — try Shotstack tab instead</p>}
+                  {rErr&&(
+                    <div className="space-y-2">
+                      <p className="text-xs text-red-400">{rErr}</p>
+                      <p className="text-[10px] text-white/25">Browser render failed — trying cloud render instead…</p>
+                      <button onClick={renderShotstack} disabled={rLoad}
+                        className="w-full py-2.5 rounded-xl text-xs font-semibold text-white transition-all disabled:opacity-50"
+                        style={{background:'linear-gradient(135deg,#7b2fff,#ff6b35)'}}>
+                        🚀 Render via Shotstack (Cloud)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
-              {renderMethod==='shotstack'&&(
+
+              {/* Mobile: Shotstack */}
+              {isMobile&&(
                 <div className="space-y-3">
-                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl"><p className="text-[10px] text-white/35">☁️ Cloud rendering · 10 free credits · Get key at <a href="https://shotstack.io" target="_blank" rel="noopener" className="text-[#00c8ff] underline">shotstack.io</a></p></div>
-                  {rLoad&&(<div className="space-y-2"><div className="flex justify-between text-xs"><span className="text-white/38">{rStat}</span><span className="text-white font-semibold">{rPct}%</span></div><div className="w-full bg-white/[0.07] rounded-full h-1 overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{width:rPct+'%',background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/></div></div>)}
+                  {rLoad&&(
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs"><span className="text-white/38">{rStat}</span><span className="text-white font-semibold">{rPct}%</span></div>
+                      <div className="w-full bg-white/[0.07] rounded-full h-1 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{width:rPct+'%',background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/>
+                      </div>
+                    </div>
+                  )}
                   {rErr&&!rLoad&&<p className="text-xs text-red-400">{rErr}</p>}
-                  {!rLoad&&(<button onClick={renderShotstack} className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all" style={{background:'linear-gradient(135deg,#7b2fff,#ff6b35)'}}>🚀 {rUrl?'Re-render':'Render via Shotstack'}</button>)}
+                  {!rLoad&&(
+                    <button onClick={renderShotstack}
+                      className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
+                      style={{background:'linear-gradient(135deg,#7b2fff,#ff6b35)'}}>
+                      🚀 {rUrl?'Re-render':'Render Video'}
+                    </button>
+                  )}
                 </div>
               )}
+
               {rUrl&&(
                 <div className="space-y-2.5 pt-2">
                   <video src={rUrl} controls className="w-full rounded-xl" style={{maxHeight:300}}/>
