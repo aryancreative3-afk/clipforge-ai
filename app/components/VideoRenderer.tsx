@@ -43,11 +43,13 @@ export default function VideoRenderer({
 
     try {
       // Use require-style loading to avoid bundler issues
-      const ffmpegModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js')
-      const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js')
+// @ts-ignore
+const ffmpegModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js')
+// @ts-ignore  
+const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js')
 
       const { FFmpeg } = ffmpegModule
-      const { toBlobURL, fetchFile } = utilModule
+      const { toBlobURL } = utilModule
 
       const ffmpeg = new FFmpeg()
 
@@ -201,7 +203,7 @@ export default function VideoRenderer({
       // Fix: handle both Uint8Array and string return types
       let videoBlob: Blob
       if (fileData instanceof Uint8Array) {
-        videoBlob = new Blob([fileData.buffer], { type: 'video/mp4' })
+        videoBlob = new Blob([fileData.buffer as ArrayBuffer], { type: 'video/mp4' })
       } else {
         const encoder = new TextEncoder()
         videoBlob = new Blob([encoder.encode(fileData as string)], { type: 'video/mp4' })
