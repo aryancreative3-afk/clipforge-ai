@@ -1,5 +1,7 @@
 'use client'
 import { useState, useRef, useCallback } from 'react'
+import { FFmpeg } from '@ffmpeg/ffmpeg'
+import { toBlobURL } from '@ffmpeg/util'
 
 interface Scene {
   id: number
@@ -42,8 +44,7 @@ export default function VideoRenderer({
     setStatusText('Loading FFmpeg…')
 
     try {
-      const { FFmpeg } = await import('@ffmpeg/ffmpeg')
-      const { toBlobURL } = await import('@ffmpeg/util')
+// imports now at top of file
 
       const ffmpeg = new FFmpeg()
 
