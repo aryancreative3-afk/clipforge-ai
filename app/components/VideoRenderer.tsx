@@ -1,7 +1,5 @@
 'use client'
 import { useState, useRef, useCallback } from 'react'
-import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { toBlobURL } from '@ffmpeg/util'
 
 interface Scene {
   id: number
@@ -25,7 +23,7 @@ interface Props {
 
 async function proxyFetch(url: string): Promise<Uint8Array> {
   const res = await fetch(`/api/proxy-media?url=${encodeURIComponent(url)}`)
-  if (!res.ok) throw new Error(`Failed to fetch: ${url}`)
+  if (!res.ok) throw new Error(`Failed to fetch media: ${res.status}`)
   const buf = await res.arrayBuffer()
   return new Uint8Array(buf)
 }
@@ -44,7 +42,12 @@ export default function VideoRenderer({
     setStatusText('Loading FFmpeg…')
 
     try {
-// imports now at top of file
+      // Use require-style loading to avoid bundler issues
+      const ffmpegModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js')
+      const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js')
+
+      const { FFmpeg } = ffmpegModule
+      const { toBlobURL, fetchFile } = utilModule
 
       const ffmpeg = new FFmpeg()
 
@@ -61,7 +64,7 @@ export default function VideoRenderer({
         )
       })
 
-      setStatusText('Loading FFmpeg core (first time ~30s)…')
+      setStatusText('Loading FFmpeg core (~30s first time)…')
       await ffmpeg.load({
         coreURL: await toBlobURL(
           'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
@@ -94,6 +97,7 @@ export default function VideoRenderer({
             const fname = `scene_${i}.${ext}`
             await ffmpeg.writeFile(fname, data)
             inputs.push(fname)
+
             if (scene.mediaType === 'image') {
               filterParts.push(
                 `[${inputIndex}:v]loop=loop=-1:size=1:start=0,` +
@@ -111,7 +115,7 @@ export default function VideoRenderer({
             concatParts.push(`[v${i}]`)
             inputIndex++
           } catch (err) {
-            console.warn(`Scene ${i} media failed, using black:`, err)
+            console.warn(`Scene ${i} failed, using black:`, err)
             filterParts.push(`color=black:size=1080x1920:duration=${duration}:rate=30[v${i}]`)
             concatParts.push(`[v${i}]`)
           }
@@ -122,7 +126,7 @@ export default function VideoRenderer({
       }
 
       setProgress(32)
-      setStatusText('Building video pipeline…')
+      setStatusText('Building pipeline…')
 
       const ffArgs: string[] = []
 
@@ -144,7 +148,7 @@ export default function VideoRenderer({
           hasAudio = true
           inputIndex++
         } catch (err) {
-          console.warn('Voiceover load failed:', err)
+          console.warn('Voiceover failed:', err)
         }
       }
 
@@ -158,12 +162,12 @@ export default function VideoRenderer({
           hasMusicAudio = true
           inputIndex++
         } catch (err) {
-          console.warn('Music load failed:', err)
+          console.warn('Music failed:', err)
         }
       }
 
       setProgress(45)
-      setStatusText('Rendering video…')
+      setStatusText('Rendering…')
 
       const concatFilter = `${concatParts.join('')}concat=n=${scenes.length}:v=1:a=0[outv]`
       let filterComplex = [...filterParts, concatFilter].join(';')
@@ -193,13 +197,16 @@ export default function VideoRenderer({
       setProgress(94)
       setStatusText('Preparing download…')
 
-      // FIX: use unknown cast to handle all return types safely
       const fileData = await ffmpeg.readFile('output.mp4')
-const uint8 = fileData instanceof Uint8Array
-        ? fileData
-        : new Uint8Array(fileData as unknown as ArrayBuffer)
-      const blob = new Blob([uint8.buffer as ArrayBuffer], { type: 'video/mp4' })
-      const objectUrl = URL.createObjectURL(blob)
+      // Fix: handle both Uint8Array and string return types
+      let videoBlob: Blob
+      if (fileData instanceof Uint8Array) {
+        videoBlob = new Blob([fileData.buffer], { type: 'video/mp4' })
+      } else {
+        const encoder = new TextEncoder()
+        videoBlob = new Blob([encoder.encode(fileData as string)], { type: 'video/mp4' })
+      }
+      const objectUrl = URL.createObjectURL(videoBlob)
 
       setProgress(100)
       setStatus('done')
@@ -234,7 +241,7 @@ const uint8 = fileData instanceof Uint8Array
             <div className="h-full rounded-full transition-all duration-500"
               style={{width:`${progress}%`,background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/>
           </div>
-          <p className="text-[10px] text-white/20 text-center">Rendering in your browser — do not close this tab</p>
+          <p className="text-[10px] text-white/20 text-center">Rendering locally — do not close this tab</p>
         </div>
       )}
       {status === 'error' && (
@@ -244,7 +251,7 @@ const uint8 = fileData instanceof Uint8Array
             style={{background:'linear-gradient(135deg,#ff4444,#ff6b35)'}}>
             🔄 Retry Render
           </button>
-          <p className="text-[10px] text-white/25 text-center">Or try the Shotstack tab for cloud rendering</p>
+          <p className="text-[10px] text-white/25 text-center">Or try the Shotstack cloud option below</p>
         </div>
       )}
       {status === 'done' && (
