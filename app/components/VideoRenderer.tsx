@@ -42,14 +42,8 @@ export default function VideoRenderer({
     setStatusText('Loading FFmpeg…')
 
     try {
-      // Use require-style loading to avoid bundler issues
-// @ts-ignore
-const ffmpegModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js')
-// @ts-ignore  
-const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js')
-
-      const { FFmpeg } = ffmpegModule
-      const { toBlobURL } = utilModule
+      const { FFmpeg } = await import('@ffmpeg/ffmpeg')
+      const { toBlobURL } = await import('@ffmpeg/util')
 
       const ffmpeg = new FFmpeg()
 
@@ -67,16 +61,20 @@ const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ff
       })
 
       setStatusText('Loading FFmpeg core (~30s first time)…')
-await ffmpeg.load({
-  coreURL: await toBlobURL(
-    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-    'text/javascript'
-  ),
-  wasmURL: await toBlobURL(
-    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
-    'application/wasm'
-  ),
-})
+      await ffmpeg.load({
+        coreURL: await toBlobURL(
+          'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
+          'text/javascript'
+        ),
+        wasmURL: await toBlobURL(
+          'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm',
+          'application/wasm'
+        ),
+        workerURL: await toBlobURL(
+          'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/worker.js',
+          'text/javascript'
+        ),
+      })
 
       setProgress(15)
       setStatus('rendering')
@@ -200,7 +198,6 @@ await ffmpeg.load({
       setStatusText('Preparing download…')
 
       const fileData = await ffmpeg.readFile('output.mp4')
-      // Fix: handle both Uint8Array and string return types
       let videoBlob: Blob
       if (fileData instanceof Uint8Array) {
         videoBlob = new Blob([fileData.buffer as ArrayBuffer], { type: 'video/mp4' })
