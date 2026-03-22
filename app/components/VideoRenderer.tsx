@@ -44,9 +44,9 @@ export default function VideoRenderer({
     try {
       // Use require-style loading to avoid bundler issues
 // @ts-ignore
-const ffmpegModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js')
+const ffmpegModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js')
 // @ts-ignore  
-const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js')
+const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js')
 
       const { FFmpeg } = ffmpegModule
       const { toBlobURL } = utilModule
@@ -67,16 +67,16 @@ const utilModule = await import(/* webpackIgnore: true */ 'https://unpkg.com/@ff
       })
 
       setStatusText('Loading FFmpeg core (~30s first time)…')
-      await ffmpeg.load({
-        coreURL: await toBlobURL(
-          'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js',
-          'text/javascript'
-        ),
-        wasmURL: await toBlobURL(
-          'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm',
-          'application/wasm'
-        ),
-      })
+await ffmpeg.load({
+  coreURL: await toBlobURL(
+    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+    'text/javascript'
+  ),
+  wasmURL: await toBlobURL(
+    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+    'application/wasm'
+  ),
+})
 
       setProgress(15)
       setStatus('rendering')
