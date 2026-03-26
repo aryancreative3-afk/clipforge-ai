@@ -288,26 +288,20 @@ export default function VideoRenderer({
   return (
     <div className="space-y-3">
       {/* Canvas positioned off-screen — must not be display:none for captureStream to work */}
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: 'fixed',
-          top: '-9999px',
-          left: '-9999px',
-          width: '1px',
-          height: '1px',
-          opacity: 0,
-          pointerEvents: 'none',
-        }}
-      />
-
-      {status === 'idle' && (
-        <button onClick={renderVideo}
-          className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
-          style={{background:'linear-gradient(135deg,#00c8ff,#7b2fff)'}}>
-          🎬 Render in Browser (Free)
-        </button>
-      )}
+{status === 'rendering' && (
+  <canvas
+    ref={canvasRef}
+    style={{
+      width: '100%',
+      aspectRatio: '9/16',
+      borderRadius: '12px',
+      display: 'block',
+    }}
+  />
+)}
+{status !== 'rendering' && (
+  <canvas ref={canvasRef} style={{display:'none'}} width={1080} height={1920}/>
+)}
 
       {status === 'rendering' && (
         <div className="space-y-2">
