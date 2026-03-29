@@ -43,7 +43,6 @@ export default function VideoRenderer({
 
     try {
       // ── LOAD ALL MEDIA ────────────────────────────────────────────
-      setStatusText('Loading scene media…')
       const sceneMedia: (HTMLVideoElement | HTMLImageElement | null)[] = []
 
       for (let i = 0; i < scenes.length; i++) {
@@ -81,9 +80,7 @@ export default function VideoRenderer({
             })
             sceneMedia.push(vid)
           }
-        } catch {
-          sceneMedia.push(null)
-        }
+        } catch { sceneMedia.push(null) }
       }
 
       // ── AUDIO SETUP ───────────────────────────────────────────────
@@ -128,6 +125,8 @@ export default function VideoRenderer({
       setProgress(30)
       setStatusText('Starting recorder…')
 
+      // Canvas must be visible in DOM for captureStream to work
+      // We handle this by showing it in the JSX when status === 'rendering'
       const canvasStream = canvas.captureStream(30)
       dest.stream.getAudioTracks().forEach(t => canvasStream.addTrack(t))
 
@@ -147,7 +146,6 @@ export default function VideoRenderer({
         if (e.data && e.data.size > 0) chunks.push(e.data)
       }
 
-      // Start videos playing
       for (const m of sceneMedia) {
         if (m instanceof HTMLVideoElement) {
           m.currentTime = 0
@@ -155,7 +153,6 @@ export default function VideoRenderer({
         }
       }
 
-      // Start recording with 1s intervals to collect data
       recorder.start(1000)
 
       // ── RENDER FRAMES ─────────────────────────────────────────────
@@ -175,11 +172,9 @@ export default function VideoRenderer({
         }
 
         for (let f = 0; f < frames; f++) {
-          // Black background
           ctx.fillStyle = '#000000'
           ctx.fillRect(0, 0, 1080, 1920)
 
-          // Draw media
           if (media instanceof HTMLImageElement && media.complete && media.naturalWidth > 0) {
             const scale = Math.max(1080 / media.naturalWidth, 1920 / media.naturalHeight)
             const w = media.naturalWidth * scale
@@ -192,7 +187,6 @@ export default function VideoRenderer({
             ctx.drawImage(media, (1080 - w) / 2, (1920 - h) / 2, w, h)
           }
 
-          // Draw caption
           if (scene.text) {
             const fontSize = 68
             ctx.font = `bold ${fontSize}px Arial, sans-serif`
@@ -215,13 +209,11 @@ export default function VideoRenderer({
             const totalH = lines.length * lineH
             const startY = 1920 * 0.78 - totalH / 2
 
-            // Background
             ctx.fillStyle = 'rgba(0,0,0,0.55)'
             ctx.beginPath()
             ctx.roundRect(1080/2 - maxWidth/2 - 36, startY - 18, maxWidth + 72, totalH + 36, 18)
             ctx.fill()
 
-            // Text
             ctx.shadowColor = 'rgba(0,0,0,0.9)'
             ctx.shadowBlur = 10
             ctx.fillStyle = captionColor || '#ffffff'
@@ -243,13 +235,11 @@ export default function VideoRenderer({
 
       // ── STOP & EXPORT ─────────────────────────────────────────────
       setProgress(90)
-      setStatusText('Finalising video…')
+      setStatusText('Finalising…')
 
-      // Request any remaining data
       if (recorder.state === 'recording') recorder.requestData()
       await new Promise<void>(r => setTimeout(r, 800))
 
-      // Stop recorder and wait for all data
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve()
         if (recorder.state !== 'inactive') recorder.stop()
@@ -259,22 +249,13 @@ export default function VideoRenderer({
       await new Promise<void>(r => setTimeout(r, 300))
       audioCtx.close()
 
-      setProgress(96)
-      setStatusText('Creating download…')
-
-      if (chunks.length === 0) {
-        throw new Error('No video data recorded — browser may not support MediaRecorder')
-      }
-
+      if (chunks.length === 0) throw new Error('No video data — try Chrome or Edge browser')
       const blob = new Blob(chunks, { type: mimeType })
-      if (blob.size === 0) {
-        throw new Error('Video file is empty — try a different browser')
-      }
+      if (blob.size === 0) throw new Error('Empty video file — try refreshing and retry')
 
       const url = URL.createObjectURL(blob)
       setProgress(100)
       setStatus('done')
-      setStatusText('Done!')
       onComplete(url)
 
     } catch (e: unknown) {
@@ -287,21 +268,28 @@ export default function VideoRenderer({
 
   return (
     <div className="space-y-3">
-      {/* Canvas positioned off-screen — must not be display:none for captureStream to work */}
-{status === 'rendering' && (
-  <canvas
-    ref={canvasRef}
-    style={{
-      width: '100%',
-      aspectRatio: '9/16',
-      borderRadius: '12px',
-      display: 'block',
-    }}
-  />
-)}
-{status !== 'rendering' && (
-  <canvas ref={canvasRef} style={{display:'none'}} width={1080} height={1920}/>
-)}
+
+      {/* Canvas — hidden when idle/done, visible as preview when rendering */}
+      <canvas
+        ref={canvasRef}
+        width={1080}
+        height={1920}
+        style={{
+          display: status === 'rendering' ? 'block' : 'none',
+          width: '100%',
+          aspectRatio: '9/16',
+          borderRadius: '12px',
+          background: '#000',
+        }}
+      />
+
+      {status === 'idle' && (
+        <button onClick={renderVideo}
+          className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
+          style={{background:'linear-gradient(135deg,#00c8ff,#7b2fff)'}}>
+          🎬 Render in Browser (Free)
+        </button>
+      )}
 
       {status === 'rendering' && (
         <div className="space-y-2">
@@ -314,7 +302,7 @@ export default function VideoRenderer({
               style={{width:`${progress}%`,background:'linear-gradient(90deg,#00c8ff,#7b2fff)'}}/>
           </div>
           <p className="text-[10px] text-white/20 text-center">
-            Rendering at 30fps · keep this tab open
+            Live preview above · keep tab open
           </p>
         </div>
       )}
